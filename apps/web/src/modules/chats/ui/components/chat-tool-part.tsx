@@ -72,6 +72,7 @@ const QUERY_RENDERERS: Record<string, (result: any) => React.ReactNode> = {
   queryBudgets: (result) => <BudgetHealthGrid data={unwrapArray(result)} />,
   getAccounts: (result) => <AccountBalanceList data={unwrapArray(result)} />,
   getSpendingAnalysis: (result) => {
+    if (!result || typeof result !== "object") return null;
     const r = result as {
       totalSpent?: number;
       previousPeriod?: {
@@ -181,6 +182,11 @@ export function ChatToolPart({
 
   if (part.state === "output-error") {
     output = undefined;
+  } else if (part.state !== "output-available") {
+    // Tool hasn't produced output yet — never call a renderer with
+    // part.output undefined/partial. isSettled below controls whether
+    // this even paints, but the renderer must not run at all yet.
+    output = undefined;
   } else if (proposalRenderer) {
     if (!sendMessage) {
       console.warn(
@@ -193,7 +199,6 @@ export function ChatToolPart({
   } else if (renderer) {
     output = renderer(part.output);
   } else if (part.output !== undefined) {
-    // Fallback — never silently drop a tool result.
     output = (
       <pre className="overflow-x-auto rounded-lg bg-muted p-2 font-mono text-xs text-muted-foreground">
         {JSON.stringify(part.output, null, 2)}

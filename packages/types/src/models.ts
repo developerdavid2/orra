@@ -106,7 +106,7 @@ export type SupportedChatModelId = SupportedChatModel["id"];
 export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "qwen/qwen3.6-27b";
 
 export function findSupportedChatModel(
-  modelId: string
+  modelId: string,
 ): SupportedChatModel | undefined {
   return SUPPORTED_CHAT_MODELS.find((m) => m.id === modelId);
 }

@@ -1,52 +1,84 @@
 import { createGroq } from "@ai-sdk/groq";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { findSupportedChatModel } from "@orra/types";
+import {
+  findSupportedChatModel,
+  type SupportedChatModel,
+  type SupportedChatModelId,
+  type SupportedProvider,
+} from "@orra/types";
+import type { ProviderOptions } from "@ai-sdk/provider-utils";
+import type { LanguageModel } from "ai";
 
-const groq = createGroq({
-  apiKey: process.env.GROQ_API_KEY ?? "",
-});
+type GroqModelId = Extract<SupportedChatModel, { provider: "groq" }>["id"];
+type OpenRouterModelId = Extract<
+  SupportedChatModel,
+  { provider: "openrouter" }
+>["id"];
+type AiGatewayModelId = Extract<
+  SupportedChatModel,
+  { provider: "ai-gateway" }
+>["id"];
 
+export type ResolvedModel = {
+  model: LanguageModel;
+  provider: SupportedProvider;
+  modelId: SupportedChatModelId;
+  providerOptions?: ProviderOptions;
+};
+
+const groq = createGroq({ apiKey: process.env.GROQ_API_KEY ?? "" });
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY ?? "",
 });
-
 const aiGateway = createOpenAICompatible({
-  name: "vercel-ai-gateway",
-  baseURL: "https://ai-gateway.vercel.sh/v1",
+  name: "ai-gateway",
   apiKey: process.env.AI_GATEWAY_API_KEY ?? "",
+  baseURL: process.env.AI_GATEWAY_BASE_URL ?? "https://ai-gateway.vercel.sh/v1",
 });
 
-export function getModelById(modelId: string) {
-  const definition = findSupportedChatModel(modelId);
-  if (!definition) {
-    throw new Error(`Unsupported model ID: ${modelId}`);
-  }
+function assertUnsupportedProvider(provider: never): never {
+  throw new Error(`Unsupported provider: ${provider}`);
+}
 
-  switch (definition.provider) {
-    case "openrouter":
-      return openrouter(definition.id);
-    case "ai-gateway":
-      return aiGateway.languageModel(definition.id);
+function resolveGroqModel(modelId: GroqModelId): ResolvedModel {
+  return { model: groq.languageModel(modelId), provider: "groq", modelId };
+}
+
+function resolveOpenRouterModel(modelId: OpenRouterModelId): ResolvedModel {
+  return { model: openrouter(modelId), provider: "openrouter", modelId };
+}
+
+function resolveAiGatewayModel(modelId: AiGatewayModelId): ResolvedModel {
+  return {
+    model: aiGateway(modelId) as any,
+    provider: "ai-gateway",
+    modelId,
+  };
+}
+
+function resolveSupportedChatModel(model: SupportedChatModel): ResolvedModel {
+  const provider = model.provider;
+  switch (model.provider) {
     case "groq":
+      return resolveGroqModel(model.id);
+    case "openrouter":
+      return resolveOpenRouterModel(model.id);
+    case "ai-gateway":
+      return resolveAiGatewayModel(model.id);
     default:
-      return groq.languageModel(definition.id);
+      return assertUnsupportedProvider(provider as never);
   }
 }
 
-export function getModel() {
-  const provider = process.env.AI_PROVIDER ?? "groq";
+export function isSupportedChatModel(
+  modelId: string,
+): modelId is SupportedChatModelId {
+  return findSupportedChatModel(modelId) != null;
+}
 
-  if (provider === "openrouter") {
-    const modelId = process.env.AI_MODEL ?? "openrouter/free";
-    return openrouter(modelId);
-  }
-
-  if (provider === "ai-gateway") {
-    const modelId = process.env.AI_MODEL ?? "google/gemini-2.5-flash-lite";
-    return aiGateway.languageModel(modelId);
-  }
-
-  const modelId = process.env.AI_MODEL ?? "qwen/qwen3.6-27b";
-  return groq.languageModel(modelId);
+export function getModelById(modelId: string): ResolvedModel {
+  const model = findSupportedChatModel(modelId);
+  if (!model) throw new Error(`Unsupported model: ${modelId}`);
+  return resolveSupportedChatModel(model);
 }

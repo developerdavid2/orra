@@ -1,21 +1,62 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import { DEFAULT_CHAT_MODEL_ID, type ToolMode } from "@orra/types";
-import type { SupportedChatModelId } from "@orra/types";
+import { useChat as useAiChat } from "@ai-sdk/react";
+import {
+  DefaultChatTransport,
+  type InferUITools,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type LanguageModelUsage,
+  type UIMessage,
+} from "ai";
+import {
+  DEFAULT_CHAT_MODEL_ID,
+  type SupportedChatModelId,
+  type ToolContracts,
+  type ToolMode,
+} from "@orra/types";
 import { webEnv } from "@orra/env/web";
-import { DefaultChatTransport } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { normalizeChatMessages } from "../lib/message-parts";
 
 export type { ChatMessage } from "../lib/message-parts";
 
+// ============================================================================
+// NightCode pattern: Type chain from ToolContracts → InferUITools → ChatTools
+// ============================================================================
+
+type ChatTools = {
+  [Name in keyof InferUITools<ToolContracts>]: {
+    input: InferUITools<ToolContracts>[Name]["input"];
+    output: unknown;
+  };
+};
+
+export type ChatMessageMetadata = {
+  mode?: ToolMode;
+  model?: SupportedChatModelId | string;
+  durationMs?: number;
+  usage?: LanguageModelUsage;
+};
+
+export type Message = UIMessage<ChatMessageMetadata, never, ChatTools>;
+
 export type ChatMode = ToolMode;
 
-export function useAIChat({ sessionId }: { sessionId: string }) {
+export function useAIChat({
+  sessionId,
+  initialMode,
+  initialModel,
+}: {
+  sessionId: string;
+  initialMode?: ToolMode;
+  initialModel?: SupportedChatModelId | string;
+}) {
   const [input, setInput] = useState("");
-  const [mode, setMode] = useState<ChatMode>("plan");
-  const [model, setModel] = useState<SupportedChatModelId>(DEFAULT_CHAT_MODEL_ID);
+  const [mode, setMode] = useState<ChatMode>(initialMode ?? "plan");
+  const [model, setModel] = useState<SupportedChatModelId>(
+    (initialModel as SupportedChatModelId) ?? DEFAULT_CHAT_MODEL_ID,
+  );
   const prevSessionId = useRef(sessionId);
 
   const isLocal = window.location.hostname === "localhost";
@@ -23,13 +64,30 @@ export function useAIChat({ sessionId }: { sessionId: string }) {
     ? `${webEnv.NEXT_PUBLIC_SERVER_URL}/v1/ai/chat/stream`
     : `/api/stream/chat`;
 
-  const chat = useChat({
-    id: sessionId,
-    transport: new DefaultChatTransport({
+  const transport = useMemo(() => {
+    return new DefaultChatTransport<Message>({
       api: url,
       credentials: "include",
-      body: { sessionId, mode, model },
-    }),
+      prepareSendMessagesRequest({ messages }) {
+        const message = messages[messages.length - 1];
+        if (!message) throw new Error("No message to send");
+
+        return {
+          body: {
+            sessionId,
+            messages,
+            mode: message.metadata?.mode ?? mode,
+            model: message.metadata?.model ?? model,
+          },
+        };
+      },
+    });
+  }, [sessionId, url, mode, model]);
+
+  const chat = useAiChat<Message>({
+    id: sessionId,
+    transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
   });
 
   useEffect(() => {
@@ -40,10 +98,24 @@ export function useAIChat({ sessionId }: { sessionId: string }) {
     }
   }, [chat, sessionId]);
 
+  useEffect(() => {
+    if (chat.error) {
+      toast.error("Streaming error", {
+        description: chat.error.message ?? "Something went wrong",
+      });
+    }
+  }, [chat.error]);
+
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    chat.sendMessage({ text: trimmed });
+    chat.sendMessage({
+      text: trimmed,
+      metadata: {
+        mode,
+        model,
+      },
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {

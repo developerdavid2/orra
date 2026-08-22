@@ -1,12 +1,6 @@
-import { Suspense } from "react";
 import { CHAT_SESSIONS_LIMIT } from "@/modules/chats/constants";
 import { ChatsView } from "@/modules/chats/ui/views/chats-view";
-import {
-  HydrateClient,
-  prefetch,
-  prefetchInfinite,
-  trpc,
-} from "@/trpc/trpc-server";
+import { HydrateClient, prefetch, trpc } from "@/trpc/trpc-server";
 
 interface PageProps {
   searchParams: Promise<{
@@ -41,9 +35,7 @@ export default async function Page({ searchParams }: PageProps) {
 
   return (
     <HydrateClient>
-      <Suspense fallback={<p>Loading</p>}>
-        <ChatsView />
-      </Suspense>
+      <ChatsView />
     </HydrateClient>
   );
 }

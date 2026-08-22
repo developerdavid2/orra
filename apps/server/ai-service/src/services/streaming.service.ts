@@ -1,42 +1,64 @@
 import { db } from "@orra/db";
 import { chatMessages } from "@orra/db/schema";
 import {
+  actToolContracts,
   CONTEXT_TOOL_SCOPE,
   DEFAULT_CHAT_MODEL_ID,
   getToolContracts,
   type StreamChatRequest,
   type StreamChatResponse,
+  type ToolContracts,
   type ToolMode,
 } from "@orra/types";
 import {
   convertToModelMessages,
-  createUIMessageStreamResponse,
   streamText,
-  toUIMessageStream,
+  validateUIMessages,
+  type InferUITools,
+  type LanguageModelUsage,
   type UIMessage,
 } from "ai";
 import { and, eq } from "drizzle-orm";
 import type { Response } from "express";
 import { fetchContext } from "../context";
-import { getModel, getModelById } from "../lib/ai-provider";
+import { getModelById } from "../lib/ai-provider";
 import { buildSystemPrompt } from "../lib/prompt";
-import { buildTools } from "../tools";
 import { AICoachService } from "./coach.service";
 
 const MAX_HISTORY_MESSAGES = 15;
 
-function scopedTools(
-  allTools: ReturnType<typeof buildTools>,
-  contextType: string,
-) {
-  // Default-deny: an unknown/unlisted context never widens to "all tools".
-  const allowed = CONTEXT_TOOL_SCOPE[contextType] ?? [];
+type ChatMessageMetadata = {
+  mode?: ToolMode;
+  model?: string;
+  durationMs?: number;
+  usage?: LanguageModelUsage;
+};
+
+export type OrraUIMessage = UIMessage<
+  ChatMessageMetadata,
+  never,
+  InferUITools<ToolContracts>
+>;
+
+function pickTools<T extends Record<string, unknown>, K extends keyof T>(
+  tools: T,
+  keys: readonly K[],
+): Pick<T, K> {
+  const allowed = new Set<keyof T>(keys);
   return Object.fromEntries(
-    Object.entries(allTools).filter(([name]) => allowed.includes(name)),
-  );
+    Object.entries(tools).filter(([name]) => allowed.has(name as keyof T)),
+  ) as Pick<T, K>;
 }
 
-function hasPendingToolCalls(message: UIMessage) {
+function scopedTools<T extends ToolContracts>(
+  allTools: T,
+  contextType: string,
+) {
+  const allowed = (CONTEXT_TOOL_SCOPE[contextType] ?? []) as (keyof T)[];
+  return pickTools(allTools, allowed);
+}
+
+function hasPendingToolCalls(message: OrraUIMessage) {
   return message.parts.some((part) => {
     if (part.type === "dynamic-tool" || part.type.startsWith("tool-")) {
       const state = (part as { state?: string }).state;
@@ -49,7 +71,7 @@ function hasPendingToolCalls(message: UIMessage) {
 export async function fetchMessageHistory(
   sessionId: string,
   userId: string,
-): Promise<UIMessage[]> {
+): Promise<OrraUIMessage[]> {
   const history = await db
     .select({
       id: chatMessages.id,
@@ -66,21 +88,15 @@ export async function fetchMessageHistory(
     .orderBy(chatMessages.createdAt)
     .limit(MAX_HISTORY_MESSAGES);
 
-  return history.map((msg) => {
-    let parts: UIMessage["parts"];
+  return history.map((msg): OrraUIMessage => {
+    let parts: OrraUIMessage["parts"];
 
-    // Try to parse as JSON (new format: UIMessage parts)
     try {
       const parsed = JSON.parse(msg.content);
-      // Validate it's an array of parts (new format)
-      if (Array.isArray(parsed)) {
-        parts = parsed;
-      } else {
-        // Old format: plain text wrapped in a text part
-        parts = [{ type: "text", text: String(msg.content) }];
-      }
+      parts = Array.isArray(parsed)
+        ? parsed
+        : [{ type: "text", text: String(msg.content) }];
     } catch {
-      // JSON parse failed — old plain-text format
       parts = [{ type: "text", text: String(msg.content) }];
     }
 
@@ -127,21 +143,22 @@ export async function handleStreamChat(
     }
 
     // 2. Fetch context & history BEFORE saving the new user message — the
-    // freshly saved turn would otherwise show up in the history result AND be
-    // appended below, handing the model (and UI stream) two copies of it.
+    // freshly saved turn would otherwise show up in the history result AND
+    // be appended below, handing the model (and UI stream) two copies of it.
+    const contextType = sessionResult.data.contextType ?? "general";
     const { data: contextData, snapshot } = await fetchContext(
       userId,
-      sessionResult.data.contextType ?? "general",
+      contextType,
       sessionResult.data.contextId,
     );
 
-    const history: UIMessage[] = await fetchMessageHistory(
+    const history: OrraUIMessage[] = await fetchMessageHistory(
       resolvedSessionId,
       userId,
     );
 
     // 3. Build + save the user message as a UIMessage (parts, not raw string)
-    const userMessage: UIMessage = {
+    const userMessage: OrraUIMessage = {
       id: crypto.randomUUID(),
       role: "user",
       parts: [{ type: "text", text: content }],
@@ -161,110 +178,134 @@ export async function handleStreamChat(
       };
     }
 
-    // History ends with the previous assistant turn; the current user turn is
-    // appended exactly once below.
-    const originalMessages: UIMessage[] = [...history, userMessage];
+    // History ends with the previous assistant turn; the current user turn
+    // is appended exactly once here.
+    const originalMessages: OrraUIMessage[] = [...history, userMessage];
 
-    const systemPrompt = buildSystemPrompt(
-      contextData,
-      sessionResult.data.contextType ?? "",
-    );
+    const systemPrompt = buildSystemPrompt(contextData, contextType);
 
-    // 4. Resolve model: requested > session default > global default
-    let resolvedModel;
-    if (requestedModel) {
-      resolvedModel = getModelById(requestedModel);
-    } else {
-      resolvedModel = getModel();
-    }
+    // 4. Resolve model: requested > global default. (No bare getModel() —
+    // that function never existed; DEFAULT_CHAT_MODEL_ID is the fallback,
+    // same role NightCode's DEFAULT_CHAT_MODEL_ID plays.)
+    const resolvedModel = getModelById(requestedModel ?? DEFAULT_CHAT_MODEL_ID);
 
-    // 5. Resolve tools: primary filter by mode, secondary defense by context
-    const contextType = sessionResult.data.contextType ?? "general";
-    const modeTools = Object.keys(
-      getToolContractsForFiltering(mode, contextType),
-    );
-
-    const allTools = buildTools(userId);
+    // 5. Resolve tools: primary filter by mode, secondary defense by context.
+    // NightCode only has step (mode), Orra additionally intersects with
+    // context scoping — everything downstream still only ever sees this one
+    // `filteredTools` object, same as NightCode only ever sees `tools`.
+    const allTools = actToolContracts;
     const contextTools = scopedTools(allTools, contextType);
 
-    // Intersection: mode allows AND context allows
-    const filteredTools = Object.fromEntries(
-      Object.entries(contextTools).filter(([name]) => modeTools.includes(name)),
-    );
+    const modeToolNames = Object.keys(
+      getToolContracts(mode),
+    ) as (keyof typeof contextTools)[];
+    const filteredTools = pickTools(contextTools, modeToolNames);
 
-    // 6. Stream
-    // maxRetries: 1 — a 429 on the AI Gateway free tier is account-wide and
-    // won't clear within the SDK's short backoff; retrying 3x (the default)
-    // only triples request count and burns rate-limit quota faster.
-    const result = streamText({
-      model: resolvedModel,
-      system: systemPrompt,
-      messages: await convertToModelMessages(originalMessages),
+    // 6. Validate and convert messages — this is the step that was missing
+    // before. validateUIMessages certifies `originalMessages` (which may
+    // contain history saved under a different mode/context) against the
+    // tools available for THIS request, before convertToModelMessages ever
+    // sees them.
+    const nextMessages = await validateUIMessages<OrraUIMessage>({
+      messages: originalMessages,
       tools: filteredTools,
-      maxRetries: 1,
+    });
+    const modelMessages = await convertToModelMessages(nextMessages, {
+      tools: filteredTools,
+    });
+
+    // 7. Stream AI response
+    let completedUsage: LanguageModelUsage | null = null;
+
+    const result = streamText({
+      model: resolvedModel.model,
+      system: systemPrompt,
+      messages: modelMessages,
+      tools: filteredTools,
+      providerOptions: resolvedModel.providerOptions,
+      maxRetries: 1, // a 429 on the free tier is account-wide; don't burn quota retrying
       stopWhen: ({ steps }) => steps.length >= 5,
-      onError: ({ error }) => {
-        console.error("[handleStreamChat] streamText error:", error);
+      onFinish(event) {
+        completedUsage = event.totalUsage;
       },
     });
 
     // Don't await the stream — let it run in the background even if the
-    // client disconnects, so persistence still completes.
+    // client disconnects, so persistence below still completes.
     result.consumeStream();
 
-    const uiStream = toUIMessageStream({
-      stream: result.stream,
-      originalMessages,
-      onFinish: async ({ messages }) => {
-        const assistantMessage = messages[messages.length - 1];
-
-        // Only save if there are no pending tool calls
-        if (assistantMessage && !hasPendingToolCalls(assistantMessage)) {
-          const duration = Date.now() - startTime;
-
-          const metadata = JSON.stringify({
-            contextSnapshot: snapshot,
-            mode,
-            model: requestedModel ?? DEFAULT_CHAT_MODEL_ID,
-            duration,
-          });
-
-          await AICoachService.saveMessage(
-            resolvedSessionId,
-            userId,
-            "assistant",
-            assistantMessage.parts,
-            undefined,
-            metadata,
-          );
+    // 8. Return streaming response
+    const uiStream = result.toUIMessageStreamResponse<OrraUIMessage>({
+      originalMessages: nextMessages,
+      messageMetadata({ part }) {
+        if (part.type === "start") {
+          return { mode, model: requestedModel ?? DEFAULT_CHAT_MODEL_ID };
         }
+        if (part.type !== "finish") return undefined;
+        return {
+          mode,
+          model: requestedModel ?? DEFAULT_CHAT_MODEL_ID,
+          durationMs: Date.now() - startTime,
+          ...(completedUsage ? { usage: completedUsage } : {}),
+        };
       },
-      onError: (error) => {
+      async onFinish(event) {
+        if (event.isAborted) return;
+        if (hasPendingToolCalls(event.responseMessage)) return; // don't save incomplete tool calls
+
+        const metadata = JSON.stringify({
+          contextSnapshot: snapshot,
+          mode,
+          model: requestedModel ?? DEFAULT_CHAT_MODEL_ID,
+          duration: Date.now() - startTime,
+          ...(completedUsage ? { usage: completedUsage } : {}),
+        });
+
+        await AICoachService.saveMessage(
+          resolvedSessionId,
+          userId,
+          "assistant",
+          event.responseMessage.parts,
+          undefined,
+          metadata,
+        );
+
+        // Credits/billing intentionally not wired up yet — Orra doesn't have
+        // a Polar-equivalent meter in place. When it does, this is where
+        // NightCode calls ingestAiUsage(), gated on `completedUsage`.
+      },
+      onError(error) {
         console.error("[handleStreamChat] stream error:", error);
-        return error instanceof Error ? error.message : String(error);
+        return error instanceof Error ? error.message : String(error); // returns string, doesn't throw — keeps stream alive
       },
     });
 
-    // Convert the Web Response from createUIMessageStreamResponse into the
-    // Express response manually — avoids relying on an unverified
-    // Express-specific convenience method for this `ai` version.
-    const response = createUIMessageStreamResponse({ stream: uiStream });
+    // 9. Pipe the Web ReadableStream into the Express response. Hono can
+    // just `return` the Response and let the runtime own the stream
+    // lifecycle; Express can't, so this manually pumps it — and cancels the
+    // upstream stream if the client disconnects mid-flight.
+    res.status(uiStream.status);
+    uiStream.headers.forEach((value, key) => res.setHeader(key, value));
 
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
-
-    if (response.body) {
-      const reader = response.body.getReader();
-      const pump = async (): Promise<void> => {
-        const { done, value } = await reader.read();
-        if (done) {
-          res.end();
-          return;
-        }
-        res.write(value);
-        return pump();
+    if (uiStream.body) {
+      const reader = uiStream.body.getReader();
+      const onClose = () => {
+        reader.cancel().catch(() => {});
       };
-      await pump();
+      res.on("close", onClose);
+
+      try {
+        const pump = async (): Promise<void> => {
+          const { done, value } = await reader.read();
+          if (done) return;
+          res.write(value);
+          return pump();
+        };
+        await pump();
+      } finally {
+        res.off("close", onClose);
+        if (!res.writableEnded) res.end();
+      }
     } else {
       res.end();
     }
@@ -273,18 +314,18 @@ export async function handleStreamChat(
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     console.error("[handleStreamChat]", err);
+
+    // If streaming already started, headers are already sent — don't try to
+    // send a second response, just close the connection.
+    if (res.headersSent) {
+      if (!res.writableEnded) res.end();
+      return { success: true };
+    }
+
     return {
       success: false,
       error: err.message,
       code: "INTERNAL_SERVER_ERROR",
     };
   }
-}
-
-function getToolContractsForFiltering(mode: ToolMode, contextType: string) {
-  const modeTools = getToolContracts(mode);
-  const allowed = CONTEXT_TOOL_SCOPE[contextType] ?? [];
-  return Object.fromEntries(
-    Object.entries(modeTools).filter(([name]) => allowed.includes(name)),
-  );
 }

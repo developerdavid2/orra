@@ -1,3 +1,12 @@
+"use client";
+
+import { SearchableCombobox } from "@/components/searchable-combobox";
+import type { ToolMode } from "@orra/types";
+import {
+  DEFAULT_CHAT_MODEL_ID,
+  SUPPORTED_CHAT_MODELS,
+  type SupportedChatModelId,
+} from "@orra/types";
 import {
   PromptInput,
   PromptInputBody,
@@ -5,17 +14,22 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
-  PromptInputSelect,
-  PromptInputSelectTrigger,
-  PromptInputSelectValue,
-  PromptInputSelectContent,
-  PromptInputSelectItem,
 } from "@orra/ui/components/ai-elements/prompt-input";
 import { Spinner } from "@orra/ui/components/spinner";
-import { SUPPORTED_CHAT_MODELS, DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@orra/types";
-import type { ToolMode } from "@orra/types";
-import { Send, Eye, Wrench } from "lucide-react";
+import { cn } from "@orra/ui/lib/utils";
+import { ArrowUp, Eye, Wrench } from "lucide-react";
 import { useMemo } from "react";
+
+const MODE_OPTIONS: { value: ToolMode; label: string; icon: typeof Eye }[] = [
+  { value: "plan", label: "Plan", icon: Eye },
+  { value: "act", label: "Act", icon: Wrench },
+];
+
+const MODEL_OPTIONS = SUPPORTED_CHAT_MODELS.map((m) => ({
+  label: m.id,
+  value: m.id,
+  sublabel: m.provider,
+}));
 
 interface ChatInputProps {
   input: string;
@@ -26,27 +40,8 @@ interface ChatInputProps {
   onModeChange?: (mode: ToolMode) => void;
   model?: SupportedChatModelId;
   onModelChange?: (model: SupportedChatModelId) => void;
+  variant?: "default" | "compact";
 }
-
-const MODE_OPTIONS: { value: ToolMode; label: string; icon: typeof Eye }[] = [
-  { value: "plan", label: "Plan", icon: Eye },
-  { value: "act", label: "Act", icon: Wrench },
-];
-
-const MODEL_GROUPS = [
-  {
-    label: "Groq (Fast & Cheap)",
-    models: SUPPORTED_CHAT_MODELS.filter((m) => m.provider === "groq"),
-  },
-  {
-    label: "OpenRouter",
-    models: SUPPORTED_CHAT_MODELS.filter((m) => m.provider === "openrouter"),
-  },
-  {
-    label: "AI Gateway",
-    models: SUPPORTED_CHAT_MODELS.filter((m) => m.provider === "ai-gateway"),
-  },
-];
 
 export function ChatInput({
   input,
@@ -57,6 +52,7 @@ export function ChatInput({
   onModeChange,
   model = DEFAULT_CHAT_MODEL_ID,
   onModelChange,
+  variant = "default",
 }: ChatInputProps) {
   const isSubmitDisabled = useMemo(() => {
     return !input?.trim() || isLoading;
@@ -67,79 +63,97 @@ export function ChatInput({
     return "ready" as const;
   }, [isLoading]);
 
+  const isCompact = variant === "compact";
+
+  const modelSelector = (
+    <SearchableCombobox
+      options={MODEL_OPTIONS}
+      value={model}
+      onChange={(v) => onModelChange?.(v as SupportedChatModelId)}
+      placeholder="Model"
+      className={cn("flex-1 resize-none text-sm py-1.5")}
+      contentClassName="w-82 lowercase"
+    />
+  );
+
+  const modeToggle = (
+    <div
+      className={cn(
+        "flex items-center rounded-md border bg-section-muted",
+        isCompact ? "p-0.5" : "p-1",
+      )}
+    >
+      {MODE_OPTIONS.map((opt) => {
+        const Icon = opt.icon;
+        const isActive = mode === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onModeChange?.(opt.value)}
+            className={cn(
+              "flex items-center gap-1 rounded font-medium transition-colors px-2 py-1 text-xs",
+              isActive
+                ? "bg-main-tint text-main shadow-sm"
+                : "text-muted-foreground/60 hover:text-foreground",
+            )}
+          >
+            <Icon className={cn(isCompact ? "size-2.5" : "size-3")} />
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const submitButton = (
+    <PromptInputSubmit
+      disabled={isSubmitDisabled}
+      status={status}
+      className={cn("rounded-full", isCompact && "size-7")}
+    >
+      {isLoading ? (
+        <Spinner className={cn(isCompact ? "size-3.5" : "size-4")} />
+      ) : (
+        <ArrowUp className={cn(isCompact ? "size-3.5" : "size-4")} />
+      )}
+    </PromptInputSubmit>
+  );
+
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full">
       <PromptInput onSubmit={(_message) => onSubmit()}>
-        <PromptInputBody>
+        <PromptInputBody className={cn(isCompact && "p-2 gap-1")}>
           <PromptInputTextarea
             value={input}
             onChange={onInputChange}
             placeholder="Ask about your finances..."
-            className="min-h-17.5 max-h-50"
+            className="min-h-15 text-sm py-1.5"
           />
+          {!isCompact && (
+            <div className="flex items-center justify-between w-full p-2">
+              {modeToggle}
+              {submitButton}
+            </div>
+          )}
         </PromptInputBody>
 
-        <PromptInputFooter>
-          <PromptInputTools>
-            <PromptInputSelect
-              value={model}
-              onValueChange={(v) => onModelChange?.(v as SupportedChatModelId)}
-            >
-              <PromptInputSelectTrigger className="h-7 text-xs">
-                <PromptInputSelectValue />
-              </PromptInputSelectTrigger>
-              <PromptInputSelectContent>
-                {MODEL_GROUPS.map((group) => (
-                  <PromptInputSelectItem
-                    key={group.label}
-                    value={group.models[0]?.id ?? model}
-                    disabled
-                    className="text-xs font-semibold text-muted-foreground"
-                  >
-                    {group.label}
-                  </PromptInputSelectItem>
-                ))}
-                {MODEL_GROUPS.flatMap((group) =>
-                  group.models.map((m) => (
-                    <PromptInputSelectItem key={m.id} value={m.id} className="text-xs">
-                      {m.id}
-                    </PromptInputSelectItem>
-                  )),
-                )}
-              </PromptInputSelectContent>
-            </PromptInputSelect>
-
-            <div className="flex items-center rounded-md border bg-muted/50 p-0.5">
-              {MODE_OPTIONS.map((opt) => {
-                const Icon = opt.icon;
-                const isActive = mode === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => onModeChange?.(opt.value)}
-                    className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-                      isActive
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="size-3" />
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </PromptInputTools>
-
-          <PromptInputSubmit disabled={isSubmitDisabled} status={status}>
-            {isLoading ? (
-              <Spinner className="size-4 " />
-            ) : (
-              <Send className="size-4" />
-            )}
-          </PromptInputSubmit>
-        </PromptInputFooter>
+        {/* Footer only for default variant */}
+        {!isCompact ? (
+          <PromptInputFooter className="border-t">
+            <PromptInputTools>{modelSelector}</PromptInputTools>
+          </PromptInputFooter>
+        ) : (
+          <PromptInputFooter>
+            <PromptInputTools className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                {modeToggle}
+                {modelSelector}
+              </div>
+              {submitButton}
+            </PromptInputTools>
+          </PromptInputFooter>
+        )}
       </PromptInput>
     </div>
   );

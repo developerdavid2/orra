@@ -1,9 +1,5 @@
 import { z } from "zod";
-import { tool, type Tool } from "ai";
-
-// ============================================================================
-// Shared input primitives
-// ============================================================================
+import { tool } from "ai";
 
 const UUID_RE =
   /^(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
@@ -19,7 +15,7 @@ const datetimeInput = () =>
       "Expected a valid ISO datetime",
     );
 
-const CATEGORIES = [
+export const CATEGORIES = [
   "food_dining",
   "utilities",
   "rent",
@@ -36,17 +32,12 @@ const CATEGORIES = [
   "other",
 ] as const;
 
-const STATUSES = ["on_track", "warning", "over"] as const;
-
+export const BUDGET_STATUSES = ["on_track", "warning", "over"] as const;
 const ACCOUNT_TYPES = ["checking", "savings", "credit", "investment"] as const;
-
 const BUDGET_PERIODS = ["weekly", "monthly", "custom"] as const;
-
-const CHART_TYPES = ["pie", "bar", "area"] as const;
-
-const CHART_PERIODS = ["7d", "30d", "90d"] as const;
-
-const ANALYSIS_PERIODS = [
+export const CHART_TYPES = ["pie", "bar", "area"] as const;
+export const CHART_PERIODS = ["7d", "30d", "90d"] as const;
+export const ANALYSIS_PERIODS = [
   "7d",
   "30d",
   "90d",
@@ -54,31 +45,23 @@ const ANALYSIS_PERIODS = [
   "last_month",
   "custom",
 ] as const;
-
-const GROUP_BY = ["category", "day", "week"] as const;
-
-const ORDER_BY = [
+export const GROUP_BY = ["category", "day", "week"] as const;
+export const ORDER_BY = [
   "date_desc",
   "date_asc",
   "amount_desc",
   "amount_asc",
 ] as const;
-
-const TX_STATUSES = [
+export const TX_STATUSES = [
   "pending",
   "successful",
   "refunded",
   "reversed",
   "failed",
 ] as const;
+export const TIMEFRAMES = ["this_week", "this_month"] as const;
 
-const TIMEFRAMES = ["this_week", "this_month"] as const;
-
-// ============================================================================
-// Input schemas — Read-only tools
-// ============================================================================
-
-export const queryTransactionsInput = z.object({
+const transactionsFilter = z.object({
   query: z.string().max(200).optional(),
   category: z.enum(CATEGORIES).optional(),
   type: z.enum(["debit", "credit"]).optional(),
@@ -88,9 +71,45 @@ export const queryTransactionsInput = z.object({
   dateTo: datetimeInput().optional(),
   onlyAnomalies: z.boolean().optional().default(false),
   orderBy: z.enum(ORDER_BY).optional().default("date_desc"),
-  limit: z.number().int().min(1).max(50).default(15),
   includeNotes: z.boolean().optional().default(false),
 });
+
+const budgetsFilter = z.object({
+  budgetId: uuidInput().optional(),
+  status: z.enum(BUDGET_STATUSES).optional(),
+  onlyActive: z.boolean().default(true),
+  includeCategories: z.boolean().default(false),
+  includeLinkedAccounts: z.boolean().default(false),
+});
+
+const accountsFilter = z.object({
+  accountId: uuidInput().optional(),
+  includeMonthlySpend: z.boolean().default(false),
+  onlyActive: z.boolean().default(true),
+});
+
+const unbudgetedSpendingFilter = z.object({});
+
+export const queryFinanceInput = z
+  .discriminatedUnion("resource", [
+    z.object({
+      resource: z.literal("transactions"),
+      filter: transactionsFilter,
+    }),
+    z.object({ resource: z.literal("budgets"), filter: budgetsFilter }),
+    z.object({ resource: z.literal("accounts"), filter: accountsFilter }),
+    z.object({
+      resource: z.literal("unbudgeted_spending"),
+      filter: unbudgetedSpendingFilter,
+    }),
+  ])
+  .and(
+    z.object({
+      limit: z.number().int().min(1).max(50).default(15),
+    }),
+  );
+
+export type QueryFinanceInput = z.infer<typeof queryFinanceInput>;
 
 export const getSpendingAnalysisInput = z.object({
   period: z.enum(ANALYSIS_PERIODS).default("30d"),
@@ -101,70 +120,45 @@ export const getSpendingAnalysisInput = z.object({
   limit: z.number().int().min(1).max(20).default(10),
   category: z.enum(CATEGORIES).optional(),
 });
+export type GetSpendingAnalysisInput = z.infer<typeof getSpendingAnalysisInput>;
 
 export const renderSpendingChartInput = z.object({
   chartType: z.enum(CHART_TYPES),
   period: z.enum(CHART_PERIODS).default("30d"),
   title: z.string(),
 });
+export type RenderSpendingChartInput = z.infer<typeof renderSpendingChartInput>;
 
-export const queryBudgetsInput = z.object({
-  budgetId: uuidInput().optional(),
-  status: z.enum(STATUSES).optional(),
-  onlyActive: z.boolean().default(true),
-  includeCategories: z.boolean().default(false),
-  includeLinkedAccounts: z.boolean().default(false),
-  limit: z.number().int().min(1).max(50).default(20),
-});
-
-export const getUnbudgetedSpendingInput = z.object({});
-
-export const getAccountsInput = z.object({
-  accountId: uuidInput().optional(),
-  includeMonthlySpend: z.boolean().default(false),
-  onlyActive: z.boolean().default(true),
-});
-
-// ============================================================================
-// Input schemas — Write tools (propose-*)
-// ============================================================================
-
-export const proposeBudgetCreateInput = z.object({
+const budgetCreateShape = {
   name: z.string(),
   period: z.enum(BUDGET_PERIODS).default("monthly"),
   categories: z.array(
-    z.object({
-      category: z.string(),
-      limitAmount: z.number().positive(),
-    }),
+    z.object({ category: z.string(), limitAmount: z.number().positive() }),
   ),
   alertThreshold: z.number().int().min(1).max(100).default(80),
   reasoning: z.string(),
-});
+};
 
-export const proposeBudgetEditInput = z.object({
+const budgetEditShape = {
   budgetId: z.string(),
   changes: z.object({
     name: z.string().optional(),
     categories: z
       .array(
-        z.object({
-          category: z.string(),
-          limitAmount: z.number().positive(),
-        }),
+        z.object({ category: z.string(), limitAmount: z.number().positive() }),
       )
       .optional(),
     alertThreshold: z.number().int().min(1).max(100).optional(),
   }),
   reasoning: z.string(),
-});
+};
 
-export const proposeBudgetDeleteInput = z.object({
+const budgetDeleteShape = {
   budgetId: z.string(),
   reasoning: z.string(),
-});
+};
 
-export const proposeBudgetRebalanceInput = z.object({
+const budgetRebalanceShape = {
   steps: z
     .array(
       z.object({
@@ -176,70 +170,91 @@ export const proposeBudgetRebalanceInput = z.object({
     .min(2)
     .max(5),
   overallReasoning: z.string(),
-});
+};
 
-export const proposeSpendingGoalInput = z.object({
+const spendingGoalShape = {
   targetAmount: z.number().positive(),
   timeframe: z.enum(TIMEFRAMES),
   reasoning: z.string(),
-});
+};
 
-export const proposeAccountCreateInput = z.object({
+const accountCreateShape = {
   name: z.string(),
   type: z.enum(ACCOUNT_TYPES),
   balance: z.number().default(0),
   bankName: z.string().optional(),
   reasoning: z.string(),
-});
+};
 
-export const proposeRecategorizeInput = z.object({
+const recategorizeShape = {
   transactionIds: z.array(z.string()).min(1).max(50),
   targetCategory: z.string(),
   reasoning: z.string(),
-});
+};
 
-export const proposeInsightDismissInput = z.object({
+const insightDismissShape = {
   insightId: z.string(),
   reasoning: z.string(),
-});
+};
 
-// ============================================================================
-// Tool input types
-// ============================================================================
+export const proposeChangeInput = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("budget_create"), ...budgetCreateShape }),
+  z.object({ kind: z.literal("budget_edit"), ...budgetEditShape }),
+  z.object({ kind: z.literal("budget_delete"), ...budgetDeleteShape }),
+  z.object({ kind: z.literal("budget_rebalance"), ...budgetRebalanceShape }),
+  z.object({ kind: z.literal("spending_goal"), ...spendingGoalShape }),
+  z.object({ kind: z.literal("account_create"), ...accountCreateShape }),
+  z.object({ kind: z.literal("recategorize"), ...recategorizeShape }),
+  z.object({ kind: z.literal("insight_dismiss"), ...insightDismissShape }),
+]);
 
-export type QueryTransactionsInput = z.infer<typeof queryTransactionsInput>;
-export type GetSpendingAnalysisInput = z.infer<typeof getSpendingAnalysisInput>;
-export type RenderSpendingChartInput = z.infer<typeof renderSpendingChartInput>;
-export type QueryBudgetsInput = z.infer<typeof queryBudgetsInput>;
-export type GetUnbudgetedSpendingInput = z.infer<
-  typeof getUnbudgetedSpendingInput
+export type ProposeChangeInput = z.infer<typeof proposeChangeInput>;
+
+// Narrow per-kind types, useful for typing handler functions individually
+// without re-deriving the discriminated union each time.
+export type ProposeBudgetCreateInput = Extract<
+  ProposeChangeInput,
+  { kind: "budget_create" }
 >;
-export type GetAccountsInput = z.infer<typeof getAccountsInput>;
-
-export type ProposeBudgetCreateInput = z.infer<typeof proposeBudgetCreateInput>;
-export type ProposeBudgetEditInput = z.infer<typeof proposeBudgetEditInput>;
-export type ProposeBudgetDeleteInput = z.infer<typeof proposeBudgetDeleteInput>;
-export type ProposeBudgetRebalanceInput = z.infer<
-  typeof proposeBudgetRebalanceInput
+export type ProposeBudgetEditInput = Extract<
+  ProposeChangeInput,
+  { kind: "budget_edit" }
 >;
-export type ProposeSpendingGoalInput = z.infer<typeof proposeSpendingGoalInput>;
-export type ProposeAccountCreateInput = z.infer<
-  typeof proposeAccountCreateInput
+export type ProposeBudgetDeleteInput = Extract<
+  ProposeChangeInput,
+  { kind: "budget_delete" }
 >;
-export type ProposeRecategorizeInput = z.infer<typeof proposeRecategorizeInput>;
-export type ProposeInsightDismissInput = z.infer<
-  typeof proposeInsightDismissInput
+export type ProposeBudgetRebalanceInput = Extract<
+  ProposeChangeInput,
+  { kind: "budget_rebalance" }
+>;
+export type ProposeSpendingGoalInput = Extract<
+  ProposeChangeInput,
+  { kind: "spending_goal" }
+>;
+export type ProposeAccountCreateInput = Extract<
+  ProposeChangeInput,
+  { kind: "account_create" }
+>;
+export type ProposeRecategorizeInput = Extract<
+  ProposeChangeInput,
+  { kind: "recategorize" }
+>;
+export type ProposeInsightDismissInput = Extract<
+  ProposeChangeInput,
+  { kind: "insight_dismiss" }
 >;
 
-// ============================================================================
-// Tool contracts (schema + description only, no execute)
-// ============================================================================
-
-export const readOnlyToolContracts: Record<string, Tool> = {
-  queryTransactions: tool({
+export const readOnlyToolContracts = {
+  queryFinance: tool({
     description:
-      "Search, list, and filter transactions by merchant/description text, category, type, status, bank account, or date range; optionally surface only anomalies or include notes.",
-    inputSchema: queryTransactionsInput,
+      "Query the user's financial data. Set `resource` to select what to look up: " +
+      "'transactions' (search/filter by merchant, category, type, status, account, date range), " +
+      "'budgets' (list budgets with computed health/percent-used), " +
+      "'accounts' (list bank accounts with balance/type/institution), or " +
+      "'unbudgeted_spending' (categories spent on this month with no active budget). " +
+      "Provide `filter` matching the chosen resource.",
+    inputSchema: queryFinanceInput,
   }),
 
   getSpendingAnalysis: tool({
@@ -253,107 +268,27 @@ export const readOnlyToolContracts: Record<string, Tool> = {
       "Render an interactive chart of the user's spending — by category (pie/bar) or over time (area).",
     inputSchema: renderSpendingChartInput,
   }),
+} as const;
 
-  queryBudgets: tool({
-    description:
-      "List budgets with computed health (on_track/warning/over), percent used, and days remaining; optionally include per-category breakdown and linked accounts.",
-    inputSchema: queryBudgetsInput,
-  }),
-
-  getUnbudgetedSpending: tool({
-    description:
-      "Find spending categories the user spent money on this month that no active budget covers.",
-    inputSchema: getUnbudgetedSpendingInput,
-  }),
-
-  getAccounts: tool({
-    description:
-      "List the user's bank accounts with balance, type, institution, and optional current-month spend.",
-    inputSchema: getAccountsInput,
-  }),
-};
-
-export const actToolContracts: Record<string, Tool> = {
+export const actToolContracts = {
   ...readOnlyToolContracts,
 
-  proposeBudgetCreate: tool({
+  proposeChange: tool({
     description:
-      "Draft a new budget proposal for user confirmation (never creates directly). Use when the user wants a budget they don't have.",
-    inputSchema: proposeBudgetCreateInput,
+      "Draft a proposed change to the user's finances for their confirmation. Never applies " +
+      "directly — this only creates a draft the user must approve. Set `kind` to select the " +
+      "operation: 'budget_create', 'budget_edit', 'budget_delete', 'budget_rebalance', " +
+      "'spending_goal', 'account_create', 'recategorize', or 'insight_dismiss', and provide the " +
+      "fields for that kind.",
+    inputSchema: proposeChangeInput,
   }),
-
-  proposeBudgetEdit: tool({
-    description:
-      "Draft changes to an existing budget for user confirmation (never edits directly). Use when suggesting a user raise/lower a limit, add/remove a category, or change the alert threshold.",
-    inputSchema: proposeBudgetEditInput,
-  }),
-
-  proposeBudgetDelete: tool({
-    description:
-      "Draft a proposal to delete a budget for user confirmation (never deletes directly). Use when the user asks to remove a budget or when suggesting cleanup of a stale one.",
-    inputSchema: proposeBudgetDeleteInput,
-  }),
-
-  proposeBudgetRebalance: tool({
-    description:
-      "Draft a multi-step plan to shift budget allocation between two or more budgets. Never applies changes directly.",
-    inputSchema: proposeBudgetRebalanceInput,
-  }),
-
-  proposeSpendingGoal: tool({
-    description:
-      "Draft a simple spending goal (not a full budget) for user confirmation — e.g. 'keep total spend under $X this month'. Never saves directly.",
-    inputSchema: proposeSpendingGoalInput,
-  }),
-
-  proposeAccountCreate: tool({
-    description:
-      "Draft a new manual account for user confirmation. Never creates directly. Use when the user wants to track an account not synced via Plaid.",
-    inputSchema: proposeAccountCreateInput,
-  }),
-
-  proposeRecategorize: tool({
-    description:
-      "Draft a proposal to recategorize one or more transactions. Never updates directly. Use when a transaction looks miscategorized or the user wants to bulk-fix a category.",
-    inputSchema: proposeRecategorizeInput,
-  }),
-
-  proposeInsightDismiss: tool({
-    description:
-      "Draft a proposal to dismiss an insight the user has already seen and doesn't find useful. Never dismisses directly.",
-    inputSchema: proposeInsightDismissInput,
-  }),
-};
-
-// ============================================================================
-// Tool mode & filtering
-// ============================================================================
+} as const;
 
 export type ToolMode = "plan" | "act";
+export type ToolContracts = typeof actToolContracts;
 
 export function getToolContracts(mode: ToolMode) {
   return mode === "plan" ? readOnlyToolContracts : actToolContracts;
 }
 
-// ============================================================================
-// Re-export all schemas under a namespace for convenience
-// ============================================================================
-
-export const toolInputSchemas = {
-  queryTransactions: queryTransactionsInput,
-  getSpendingAnalysis: getSpendingAnalysisInput,
-  renderSpendingChart: renderSpendingChartInput,
-  queryBudgets: queryBudgetsInput,
-  getUnbudgetedSpending: getUnbudgetedSpendingInput,
-  getAccounts: getAccountsInput,
-  proposeBudgetCreate: proposeBudgetCreateInput,
-  proposeBudgetEdit: proposeBudgetEditInput,
-  proposeBudgetDelete: proposeBudgetDeleteInput,
-  proposeBudgetRebalance: proposeBudgetRebalanceInput,
-  proposeSpendingGoal: proposeSpendingGoalInput,
-  proposeAccountCreate: proposeAccountCreateInput,
-  proposeRecategorize: proposeRecategorizeInput,
-  proposeInsightDismiss: proposeInsightDismissInput,
-} as const;
-
-export type ToolName = keyof typeof toolInputSchemas;
+export type ToolName = keyof ToolContracts;
