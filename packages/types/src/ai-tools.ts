@@ -15,6 +15,42 @@ const datetimeInput = () =>
       "Expected a valid ISO datetime",
     );
 
+// Small models (Groq) sometimes emit booleans as "true"/"false" strings; the
+// union widens the JSON Schema so the provider-side validator accepts both,
+// and the transform normalizes to a real boolean before execute runs.
+const booleanish = () =>
+  z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .transform((v) => v === true || v === "true");
+
+// Models frequently stringify numbers ("80"); accept both and coerce before
+// the real constraints run.
+const numericish = (schema: z.ZodNumber) =>
+  z
+    .union([z.number(), z.string()])
+    .transform((v) => (typeof v === "number" ? v : Number.parseFloat(v)))
+    .pipe(schema);
+
+// Models sometimes encode arrays as JSON strings ("[{\"a\":1}]"); accept both.
+// Items stay untyped (unknown[]) until the trailing pipe runs them through
+// `item`, so output inference stays z.output<T>[].
+const jsonishArray = <T extends z.ZodTypeAny>(item: T) =>
+  z
+    .union([z.array(item), z.string()])
+    .transform((v, ctx): unknown[] => {
+      if (Array.isArray(v)) return v;
+      try {
+        const parsed: unknown = JSON.parse(v);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+      ctx.addIssue({
+        code: "custom",
+        message: "Expected an array or a JSON-encoded array",
+      });
+      return z.NEVER;
+    })
+    .pipe(z.array(item));
+
 export const CATEGORIES = [
   "food_dining",
   "utilities",
@@ -69,45 +105,57 @@ const transactionsFilter = z.object({
   accountId: uuidInput().optional(),
   dateFrom: datetimeInput().optional(),
   dateTo: datetimeInput().optional(),
-  onlyAnomalies: z.boolean().optional().default(false),
+  onlyAnomalies: booleanish().optional().default(false),
   orderBy: z.enum(ORDER_BY).optional().default("date_desc"),
-  includeNotes: z.boolean().optional().default(false),
+  includeNotes: booleanish().optional().default(false),
 });
 
 const budgetsFilter = z.object({
   budgetId: uuidInput().optional(),
   status: z.enum(BUDGET_STATUSES).optional(),
-  onlyActive: z.boolean().default(true),
-  includeCategories: z.boolean().default(false),
-  includeLinkedAccounts: z.boolean().default(false),
+  onlyActive: booleanish().default(true),
+  includeCategories: booleanish().default(false),
+  includeLinkedAccounts: booleanish().default(false),
 });
 
 const accountsFilter = z.object({
   accountId: uuidInput().optional(),
-  includeMonthlySpend: z.boolean().default(false),
-  onlyActive: z.boolean().default(true),
+  includeMonthlySpend: booleanish().default(false),
+  onlyActive: booleanish().default(true),
 });
 
 const unbudgetedSpendingFilter = z.object({});
 
-export const queryFinanceInput = z
-  .discriminatedUnion("resource", [
-    z.object({
-      resource: z.literal("transactions"),
-      filter: transactionsFilter,
-    }),
-    z.object({ resource: z.literal("budgets"), filter: budgetsFilter }),
-    z.object({ resource: z.literal("accounts"), filter: accountsFilter }),
-    z.object({
-      resource: z.literal("unbudgeted_spending"),
-      filter: unbudgetedSpendingFilter,
-    }),
-  ])
-  .and(
-    z.object({
-      limit: z.number().int().min(1).max(50).default(15),
-    }),
-  );
+// NOTE: `limit` lives inside each union member rather than being attached via
+// `.and()`. An intersection emits JSON Schema `allOf` branches, and Groq's
+// server-side tool validator then flags the other members' keys ("resource",
+// "filter") as additionalProperties not allowed.
+const withLimit = {
+  limit: z.number().int().min(1).max(50).default(15),
+};
+
+export const queryFinanceInput = z.discriminatedUnion("resource", [
+  z.object({
+    resource: z.literal("transactions"),
+    filter: transactionsFilter,
+    ...withLimit,
+  }),
+  z.object({
+    resource: z.literal("budgets"),
+    filter: budgetsFilter,
+    ...withLimit,
+  }),
+  z.object({
+    resource: z.literal("accounts"),
+    filter: accountsFilter,
+    ...withLimit,
+  }),
+  z.object({
+    resource: z.literal("unbudgeted_spending"),
+    filter: unbudgetedSpendingFilter,
+    ...withLimit,
+  }),
+]);
 
 export type QueryFinanceInput = z.infer<typeof queryFinanceInput>;
 
@@ -116,7 +164,7 @@ export const getSpendingAnalysisInput = z.object({
   dateFrom: datetimeInput().optional().describe("Required when period=custom"),
   dateTo: datetimeInput().optional().describe("Required when period=custom"),
   groupBy: z.enum(GROUP_BY).default("category"),
-  comparePrevious: z.boolean().default(true),
+  comparePrevious: booleanish().default(true),
   limit: z.number().int().min(1).max(20).default(10),
   category: z.enum(CATEGORIES).optional(),
 });
@@ -132,10 +180,13 @@ export type RenderSpendingChartInput = z.infer<typeof renderSpendingChartInput>;
 const budgetCreateShape = {
   name: z.string(),
   period: z.enum(BUDGET_PERIODS).default("monthly"),
-  categories: z.array(
-    z.object({ category: z.string(), limitAmount: z.number().positive() }),
+  categories: jsonishArray(
+    z.object({
+      category: z.string(),
+      limitAmount: numericish(z.number().positive()),
+    }),
   ),
-  alertThreshold: z.number().int().min(1).max(100).default(80),
+  alertThreshold: numericish(z.number().int().min(1).max(100)).default(80),
   reasoning: z.string(),
 };
 
@@ -143,12 +194,13 @@ const budgetEditShape = {
   budgetId: z.string(),
   changes: z.object({
     name: z.string().optional(),
-    categories: z
-      .array(
-        z.object({ category: z.string(), limitAmount: z.number().positive() }),
-      )
-      .optional(),
-    alertThreshold: z.number().int().min(1).max(100).optional(),
+    categories: jsonishArray(
+      z.object({
+        category: z.string(),
+        limitAmount: numericish(z.number().positive()),
+      }),
+    ).optional(),
+    alertThreshold: numericish(z.number().int().min(1).max(100)).optional(),
   }),
   reasoning: z.string(),
 };
@@ -159,21 +211,18 @@ const budgetDeleteShape = {
 };
 
 const budgetRebalanceShape = {
-  steps: z
-    .array(
-      z.object({
-        budgetId: z.string(),
-        changeAmount: z.number(),
-        reason: z.string(),
-      }),
-    )
-    .min(2)
-    .max(5),
+  steps: jsonishArray(
+    z.object({
+      budgetId: z.string(),
+      changeAmount: numericish(z.number()),
+      reason: z.string(),
+    }),
+  ).check(z.minLength(2), z.maxLength(5)),
   overallReasoning: z.string(),
 };
 
 const spendingGoalShape = {
-  targetAmount: z.number().positive(),
+  targetAmount: numericish(z.number().positive()),
   timeframe: z.enum(TIMEFRAMES),
   reasoning: z.string(),
 };
@@ -181,13 +230,13 @@ const spendingGoalShape = {
 const accountCreateShape = {
   name: z.string(),
   type: z.enum(ACCOUNT_TYPES),
-  balance: z.number().default(0),
+  balance: numericish(z.number()).default(0),
   bankName: z.string().optional(),
   reasoning: z.string(),
 };
 
 const recategorizeShape = {
-  transactionIds: z.array(z.string()).min(1).max(50),
+  transactionIds: jsonishArray(z.string()).check(z.minLength(1), z.maxLength(50)),
   targetCategory: z.string(),
   reasoning: z.string(),
 };

@@ -50,8 +50,8 @@ export const InsightCard = ({
   const isPending = dismissing || restoring;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
       className={cn(
         "group relative flex flex-col items-start text-left transition-colors cursor-pointer w-full",
         isFull ? "gap-3 px-6 py-5" : "gap-2 px-5 py-4",
@@ -64,6 +64,7 @@ export const InsightCard = ({
       tabIndex={0}
       onKeyDown={(e) => {
         if (!isPending && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
           onOpen(insight.id);
         }
       }}
@@ -261,7 +262,7 @@ export const InsightCard = ({
           </button>
         </div>
       )}
-    </button>
+    </div>
   );
 };
 

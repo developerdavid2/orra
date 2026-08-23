@@ -24,6 +24,7 @@ import { ChatSessionShell } from "./chat-session-shell";
 import { ChatStreamMessage } from "./chat-stream-message";
 import type { SupportedChatModelId } from "@orra/types";
 import { ChatTypingIndicator } from "./chat-typing-indicator";
+import { cn } from "@orra/ui/lib/utils";
 
 interface Props {
   sessionId: string;
@@ -55,7 +56,9 @@ export function ChatConversationArea({
     handleInputChange,
     handleSubmit,
     sendMessage,
+    stop,
     isLoading,
+    status,
     mode,
     setMode,
     model,
@@ -122,6 +125,8 @@ export function ChatConversationArea({
         isLoading={isLoading}
         onInputChange={handleInputChange}
         onSubmit={handleSubmit}
+        onStop={stop}
+        status={status}
         mode={mode}
         onModeChange={setMode}
         model={model}
@@ -151,8 +156,8 @@ export function ChatConversationArea({
           ) : undefined
         }
       >
-        <Conversation className="flex-1">
-          <ConversationContent className="p-4 space-y-4 ">
+        <Conversation className="min-h-0 w-full mb-42">
+          <ConversationContent className="max-w-4xl mx-auto w-full p-4 space-y-4">
             <InfiniteScroll
               hasNextPage={hasNextPage ?? false}
               isFetchingNextPage={isFetchingNextPage}
@@ -194,30 +199,52 @@ export function ChatConversationArea({
     </div>
   );
 }
+function SkeletonMessageRow({
+  width,
+  isUser,
+}: {
+  width: number;
+  isUser: boolean;
+}) {
+  return (
+    <div
+      className={cn("flex gap-3", isUser && "flex-row-reverse justify-start")}
+    >
+      {isUser ? (
+        <Skeleton className="size-8 shrink-0 rounded-full" />
+      ) : (
+        <Skeleton className="size-8 shrink-0 rounded-full bg-primary/20" />
+      )}
+      <div
+        className={cn(
+          "flex-1 space-y-2",
+          isUser ? "flex flex-col items-end" : "max-w-[60%]",
+        )}
+      >
+        <Skeleton
+          className="h-12 bg-main-tint/90"
+          style={{ width: `${width}%`, maxWidth: isUser ? "60%" : "100%" }}
+        />
+      </div>
+    </div>
+  );
+}
 
 function SkeletonMessages() {
+  const rows = [
+    { width: 50, isUser: false },
+    { width: 40, isUser: true },
+    { width: 30, isUser: false },
+    { width: 20, isUser: true },
+    { width: 70, isUser: false },
+    { width: 20, isUser: true },
+  ];
+
   return (
-    <div className="no-scrollbar flex-1 space-y-10 overflow-y-auto p-4 pb-32">
+    <div className="no-scrollbar flex-1 space-y-10 overflow-y-auto p-4 mb-42">
       <div className="max-w-4xl mx-auto w-full space-y-12">
-        {[50, 40, 30, 20, 70, 20].map((width, i) => (
-          <div
-            key={i}
-            className={
-              i % 2 === 0 ? "flex gap-3" : "flex gap-3 flex-row-reverse"
-            }
-          >
-            {i % 2 === 0 ? (
-              <Skeleton className="size-8 shrink-0 rounded-full" />
-            ) : (
-              <Skeleton className="size-8 shrink-0 rounded-full bg-primary/30" />
-            )}
-            <div className="max-w-[60%] flex-1 space-y-2">
-              <Skeleton
-                className="h-12 w-full"
-                style={{ maxWidth: `${width}%` }}
-              />
-            </div>
-          </div>
+        {rows.map((row, i) => (
+          <SkeletonMessageRow key={i} width={row.width} isUser={row.isUser} />
         ))}
       </div>
     </div>
@@ -226,8 +253,8 @@ function SkeletonMessages() {
 
 function DisabledFooter() {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 border-t bg-background/95 p-4 opacity-50 backdrop-blur-sm">
-      <div className="max-w-4xl mx-auto w-full">
+    <div className="absolute inset-x-0 bottom-0 z-10 border-t bg-background/95 backdrop-blur-sm">
+      <div className="max-w-4xl mx-auto w-full p-4 pointer-events-none opacity-50">
         <ChatInput
           variant="compact"
           input=""
@@ -243,13 +270,11 @@ function DisabledFooter() {
 export function ChatConversationSkeleton() {
   return (
     <div className="flex h-full w-full flex-col">
-      {/* Header */}
       <header className="flex items-center border-b px-4 py-3">
         <Skeleton className="h-4 w-48" />
       </header>
 
-      {/* Body — same structure as ChatSessionShell */}
-      <div className="relative mx-auto flex min-h-0 w-full flex-1 flex-col">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col mx-auto">
         <SkeletonMessages />
         <DisabledFooter />
       </div>
@@ -257,6 +282,11 @@ export function ChatConversationSkeleton() {
   );
 }
 
+/**
+ * Fallback for a session arriving fresh from /dashboard/ai-chat/new.
+ * Continues the exact UI that route was showing (optimistic user bubble +
+ * typing indicator) so the redirect is visually seamless — no skeleton flash.
+ */
 export function ChatFreshSessionFallback({ message }: { message: string }) {
   return (
     <div className="flex h-full w-full flex-col">
@@ -264,7 +294,7 @@ export function ChatFreshSessionFallback({ message }: { message: string }) {
         <h2 className="truncate text-sm font-semibold">&nbsp;</h2>
       </header>
 
-      <div className="relative mx-auto flex min-h-0 w-full flex-1 flex-col">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col mx-auto">
         <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto p-4 pb-32">
           <div className="max-w-4xl mx-auto w-full space-y-4">
             <ChatStreamMessage

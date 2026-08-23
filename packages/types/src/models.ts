@@ -12,35 +12,37 @@ export interface SupportedChatModelDefinition {
 }
 
 export const SUPPORTED_CHAT_MODELS = [
-  // Groq (default, cheapest)
+  // Groq — live lineup as of Aug 2026 (llama-3.3-70b-versatile shut down
+  // 08/16/26, mixtral-8x7b back in 03/25; see console.groq.com/docs/deprecations)
   {
     id: "qwen/qwen3.6-27b",
     provider: "groq",
     pricing: {
+      inputUsdPerMillionTokens: 0.6,
+      outputUsdPerMillionTokens: 3.0,
+    },
+  },
+  {
+    id: "openai/gpt-oss-120b",
+    provider: "groq",
+    pricing: {
       inputUsdPerMillionTokens: 0.15,
-      outputUsdPerMillionTokens: 0.15,
+      outputUsdPerMillionTokens: 0.6,
     },
   },
   {
-    id: "llama-3.3-70b-versatile",
+    id: "openai/gpt-oss-20b",
     provider: "groq",
     pricing: {
-      inputUsdPerMillionTokens: 0.59,
-      outputUsdPerMillionTokens: 0.79,
-    },
-  },
-  {
-    id: "mixtral-8x7b-32768",
-    provider: "groq",
-    pricing: {
-      inputUsdPerMillionTokens: 0.24,
-      outputUsdPerMillionTokens: 0.24,
+      inputUsdPerMillionTokens: 0.075,
+      outputUsdPerMillionTokens: 0.3,
     },
   },
 
-  // OpenRouter
+  // OpenRouter — evergreen family aliases that always resolve to the
+  // current version, so individual models can't go stale/decommissioned.
   {
-    id: "anthropic/claude-3.5-sonnet",
+    id: "~anthropic/claude-sonnet-latest",
     provider: "openrouter",
     pricing: {
       inputUsdPerMillionTokens: 3.0,
@@ -48,53 +50,64 @@ export const SUPPORTED_CHAT_MODELS = [
     },
   },
   {
-    id: "openai/gpt-4o",
+    id: "google/gemini-2.5-flash",
     provider: "openrouter",
     pricing: {
-      inputUsdPerMillionTokens: 2.5,
-      outputUsdPerMillionTokens: 10.0,
-    },
-  },
-  {
-    id: "google/gemini-2.0-flash-001",
-    provider: "openrouter",
-    pricing: {
-      inputUsdPerMillionTokens: 0.1,
-      outputUsdPerMillionTokens: 0.4,
-    },
-  },
-  {
-    id: "meta-llama/llama-3.1-405b-instruct",
-    provider: "openrouter",
-    pricing: {
-      inputUsdPerMillionTokens: 3.0,
-      outputUsdPerMillionTokens: 3.0,
+      inputUsdPerMillionTokens: 0.375,
+      outputUsdPerMillionTokens: 1.875,
     },
   },
 
-  // Vercel AI Gateway
+  // OpenRouter :free tier (verified Aug 2026, tool-capable per OpenRouter API)
   {
-    id: "google/gemini-2.5-flash-lite",
-    provider: "ai-gateway",
+    id: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    provider: "openrouter",
     pricing: {
-      inputUsdPerMillionTokens: 0.075,
-      outputUsdPerMillionTokens: 0.3,
+      inputUsdPerMillionTokens: 0,
+      outputUsdPerMillionTokens: 0,
     },
   },
   {
-    id: "openai/gpt-4o-mini",
-    provider: "ai-gateway",
+    id: "z-ai/glm-5.2:free",
+    provider: "openrouter",
     pricing: {
-      inputUsdPerMillionTokens: 0.15,
-      outputUsdPerMillionTokens: 0.6,
+      inputUsdPerMillionTokens: 0,
+      outputUsdPerMillionTokens: 0,
     },
   },
   {
-    id: "anthropic/claude-3.5-haiku",
+    id: "thinkingmachines/inkling:free",
+    provider: "openrouter",
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputUsdPerMillionTokens: 0,
+    },
+  },
+  {
+    id: "google/gemma-4-31b-it:free",
+    provider: "openrouter",
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputUsdPerMillionTokens: 0,
+    },
+  },
+
+  // Vercel AI Gateway free tier (verified Aug 2026, tool-capable per
+  // ai-gateway.vercel.sh/v1/models, pricing.input/output === "0")
+  {
+    id: "nvidia/nemotron-3.5-lightning-free",
     provider: "ai-gateway",
     pricing: {
-      inputUsdPerMillionTokens: 0.8,
-      outputUsdPerMillionTokens: 4.0,
+      inputUsdPerMillionTokens: 0,
+      outputUsdPerMillionTokens: 0,
+    },
+  },
+  {
+    id: "poolside/laguna-s-2.1-free",
+    provider: "ai-gateway",
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputUsdPerMillionTokens: 0,
     },
   },
 ] as const satisfies readonly SupportedChatModelDefinition[];

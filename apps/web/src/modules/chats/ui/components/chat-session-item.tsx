@@ -171,7 +171,7 @@ export function ChatSessionItem({
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuContent align="end" className="w-40 z-150">
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();

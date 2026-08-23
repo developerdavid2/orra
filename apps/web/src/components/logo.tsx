@@ -9,6 +9,8 @@ import type { Route } from "next";
 interface LogoProps {
   /** Path relative to /public directory or remote URL */
   src?: string;
+  /** Alternate image URL shown in light mode (src is used in dark mode) */
+  lightSrc?: string;
   /** Fixed width & height in px. Ignored when `fill` is true. */
   size?: number;
   /** Enables Next.js fill mode for responsive scaling based on parent container. */
@@ -24,6 +26,7 @@ interface LogoProps {
 
 export function Logo({
   src = "https://eqr61bekec.ufs.sh/f/sH4weU3V69zXnzhdeSMk3esQXWfzAdqRZFS04jaIGwr1umCg",
+  lightSrc,
   size = 32,
   fill = false,
   className,
@@ -43,6 +46,10 @@ export function Logo({
 
   const shouldDisplayText = showText !== undefined ? showText : isExpanded;
 
+  const hasLightVariant = Boolean(lightSrc);
+  const imageBaseClass =
+    "object-contain transition-transform duration-300 hover:scale-105";
+
   return (
     <Link
       href={href as Route}
@@ -59,23 +66,53 @@ export function Logo({
         )}
         style={!fill ? { width: `${size}px`, height: `${size}px` } : undefined}
       >
-        <Image
-          src={src}
-          alt="Orra Logo"
-          fill={fill}
-          width={!fill ? size : undefined}
-          height={!fill ? size : undefined}
-          priority
-          className={cn(
-            "object-contain transition-transform duration-300 hover:scale-105",
-            imageClassName,
-          )}
-        />
+        {hasLightVariant ? (
+          <>
+            {/* Dark mode variant */}
+            <Image
+              src={src}
+              alt="Orra Logo"
+              fill={fill}
+              width={!fill ? size : undefined}
+              height={!fill ? size : undefined}
+              priority
+              className={cn(
+                imageBaseClass,
+                "hidden dark:block",
+                imageClassName,
+              )}
+            />
+            {/* Light mode variant */}
+            <Image
+              src={lightSrc as string}
+              alt="Orra Logo"
+              fill={fill}
+              width={!fill ? size : undefined}
+              height={!fill ? size : undefined}
+              priority
+              className={cn(
+                imageBaseClass,
+                "block dark:hidden",
+                imageClassName,
+              )}
+            />
+          </>
+        ) : (
+          <Image
+            src={src}
+            alt="Orra Logo"
+            fill={fill}
+            width={!fill ? size : undefined}
+            height={!fill ? size : undefined}
+            priority
+            className={cn(imageBaseClass, imageClassName)}
+          />
+        )}
       </div>
 
       {/* Brand Text */}
       {shouldDisplayText && (
-        <span className="text-[15px] font-semibold tracking-tight text-foreground transition-opacity duration-200">
+        <span className="text-[20px] font-semibold tracking-wide text-foreground transition-opacity duration-200 font-rostex">
           Orra
         </span>
       )}

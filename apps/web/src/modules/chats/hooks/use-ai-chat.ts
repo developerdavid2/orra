@@ -10,6 +10,7 @@ import {
 } from "ai";
 import {
   DEFAULT_CHAT_MODEL_ID,
+  findSupportedChatModel,
   type SupportedChatModelId,
   type ToolContracts,
   type ToolMode,
@@ -55,7 +56,11 @@ export function useAIChat({
   const [input, setInput] = useState("");
   const [mode, setMode] = useState<ChatMode>(initialMode ?? "plan");
   const [model, setModel] = useState<SupportedChatModelId>(
-    (initialModel as SupportedChatModelId) ?? DEFAULT_CHAT_MODEL_ID,
+    // Old chats/URLs can carry decommissioned model ids (e.g. Groq shut down
+    // llama-3.3-70b-versatile on 08/16/26) — only accept ids still registered.
+    initialModel && findSupportedChatModel(initialModel)
+      ? (initialModel as SupportedChatModelId)
+      : DEFAULT_CHAT_MODEL_ID,
   );
   const prevSessionId = useRef(sessionId);
 
@@ -100,8 +105,9 @@ export function useAIChat({
 
   useEffect(() => {
     if (chat.error) {
-      toast.error("Streaming error", {
-        description: chat.error.message ?? "Something went wrong",
+      console.error("[useAIChat] stream error:", chat.error);
+      toast.error("Something went wrong", {
+        description: "We couldn't finish that response. Please try again.",
       });
     }
   }, [chat.error]);
@@ -152,6 +158,7 @@ export function useAIChat({
     setMessages: chat.setMessages,
     status: chat.status,
     sendMessage,
+    stop: chat.stop,
     mode,
     setMode,
     model,

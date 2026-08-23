@@ -57,7 +57,11 @@ export const DashboardSidebar = () => {
     <Sidebar collapsible="icon" className="bg-sidebar font-sans">
       {/* ── Logo ── */}
       <SidebarHeader className="border-b border-border px-2 py-3">
-        <Logo size={28} />
+        <Logo
+          size={28}
+          href="/dashboard"
+          lightSrc="https://eqr61bekec.ufs.sh/f/sH4weU3V69zXXnnMPIifkPbws3hnSHtBAq6jeKT2Fr7GvEda"
+        />
       </SidebarHeader>
 
       {/* ── Nav groups ── */}

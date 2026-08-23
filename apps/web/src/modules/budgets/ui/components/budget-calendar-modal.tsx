@@ -31,14 +31,16 @@ export function BudgetCalendarModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="flex h-150 max-h-[85dvh] flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             {format(date, "EEEE, MMMM d, yyyy")}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3 mt-4">
+        {/* Fixed-height shell: the day's budget list scrolls inside
+            (scrollbar hidden) instead of stretching the dialog. */}
+        <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
           {day.budgets.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               No budgets for this day

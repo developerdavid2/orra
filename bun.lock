@@ -23,6 +23,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@ai-sdk/anthropic": "^4.0.38",
+        "@ai-sdk/gateway": "^3.0.179",
         "@ai-sdk/groq": "^3.0.41",
         "@ai-sdk/huggingface": "^2.0.30",
         "@ai-sdk/openai-compatible": "^3.0.30",

@@ -68,9 +68,6 @@ const unwrapArray = (result: any): any => {
 // Query/render tools — pure data-in, JSX-out, no chat interaction needed.
 const QUERY_RENDERERS: Record<string, (result: any) => React.ReactNode> = {
   renderSpendingChart: (result) => <ChatSpendingChart {...result} />,
-  queryTransactions: (result) => <TransactionList data={unwrapArray(result)} />,
-  queryBudgets: (result) => <BudgetHealthGrid data={unwrapArray(result)} />,
-  getAccounts: (result) => <AccountBalanceList data={unwrapArray(result)} />,
   getSpendingAnalysis: (result) => {
     if (!result || typeof result !== "object") return null;
     const r = result as {
@@ -113,6 +110,47 @@ const QUERY_RENDERERS: Record<string, (result: any) => React.ReactNode> = {
       </div>
     );
   },
+  // Consolidated query tool — dispatch on the resource the executor echoed.
+  queryFinance: (result) => {
+    if (!result || typeof result !== "object") return null;
+    const r = result as Record<string, any>;
+
+    if (r.resource === "transactions") {
+      return <TransactionList data={unwrapArray(r.transactions)} />;
+    }
+    if (r.resource === "budgets") {
+      return <BudgetHealthGrid data={r.budgets ?? []} />;
+    }
+    if (r.resource === "accounts") {
+      return <AccountBalanceList data={r.accounts ?? []} />;
+    }
+    if (r.resource === "unbudgeted_spending") {
+      const categories: { category: string; totalSpent: number }[] =
+        r.categories ?? [];
+      if (categories.length === 0) {
+        return null;
+      }
+      return (
+        <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border">
+          <p className="bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            Unbudgeted spending — {String(r.month ?? "")}
+          </p>
+          {categories.map((c, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between px-3 py-2 text-sm"
+            >
+              <span className="text-muted-foreground capitalize">
+                {(c.category ?? "other").replace(/_/g, " ")}
+              </span>
+              <span className="font-medium">{formatAmount(c.totalSpent)}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  },
 };
 
 // Propose tools — need sendMessage wired through for confirm/decline.
@@ -120,30 +158,85 @@ const PROPOSAL_RENDERERS: Record<
   string,
   (result: any, sendMessage: (text: string) => void) => React.ReactNode
 > = {
-  proposeBudgetCreate: (result, sendMessage) => (
-    <BudgetProposalCard {...result} sendMessage={sendMessage} />
-  ),
-  proposeAccountCreate: (result, sendMessage) => (
-    <AccountCreateProposalCard {...result} sendMessage={sendMessage} />
-  ),
-  proposeBudgetEdit: (result, sendMessage) => (
-    <BudgetEditProposalCard {...result} sendMessage={sendMessage} />
-  ),
-  proposeBudgetDelete: (result, sendMessage) => (
-    <BudgetDeleteProposalCard {...result} sendMessage={sendMessage} />
-  ),
-  proposeBudgetRebalance: (result, sendMessage) => (
-    <BudgetRebalanceProposalCard {...result} sendMessage={sendMessage} />
-  ),
-  proposeSpendingGoal: (result, sendMessage) => (
-    <SpendingGoalProposalCard {...result} sendMessage={sendMessage} />
-  ),
-  proposeRecategorize: (result, sendMessage) => (
-    <RecategorizeProposalCard {...result} sendMessage={sendMessage} />
-  ),
-  proposeInsightDismiss: (result, sendMessage) => (
-    <InsightDismissProposalCard {...result} sendMessage={sendMessage} />
-  ),
+  // Consolidated proposal tool — dispatch on the draft kind.
+  proposeChange: (result, sendMessage) => {
+    if (!result || typeof result !== "object") return null;
+    const r = result as Record<string, any>;
+    switch (r.kind) {
+      case "budget_create":
+        return (
+          <BudgetProposalCard
+            proposalId={r.proposalId}
+            draft={r.draft}
+            reasoning={r.reasoning}
+            sendMessage={sendMessage}
+          />
+        );
+      case "account_create":
+        return (
+          <AccountCreateProposalCard
+            draft={r.draft}
+            reasoning={r.reasoning}
+            sendMessage={sendMessage}
+          />
+        );
+      case "budget_edit":
+        return (
+          <BudgetEditProposalCard
+            budgetId={r.budgetId}
+            current={r.current}
+            proposed={r.proposed}
+            reasoning={r.reasoning}
+            sendMessage={sendMessage}
+          />
+        );
+      case "budget_delete":
+        return (
+          <BudgetDeleteProposalCard
+            budgetId={r.budgetId}
+            budgetName={r.budgetName}
+            reasoning={r.reasoning}
+            sendMessage={sendMessage}
+          />
+        );
+      case "budget_rebalance":
+        return (
+          <BudgetRebalanceProposalCard
+            steps={r.steps}
+            overallReasoning={r.overallReasoning}
+            sendMessage={sendMessage}
+          />
+        );
+      case "spending_goal":
+        return (
+          <SpendingGoalProposalCard
+            draft={r.draft}
+            reasoning={r.reasoning}
+            sendMessage={sendMessage}
+          />
+        );
+      case "recategorize":
+        return (
+          <RecategorizeProposalCard
+            targetCategory={r.targetCategory}
+            changes={r.changes}
+            reasoning={r.reasoning}
+            sendMessage={sendMessage}
+          />
+        );
+      case "insight_dismiss":
+        return (
+          <InsightDismissProposalCard
+            insightId={r.insightId}
+            insightTitle={r.insightTitle}
+            reasoning={r.reasoning}
+            sendMessage={sendMessage}
+          />
+        );
+      default:
+        return null;
+    }
+  },
 };
 
 const getToolIcon = (toolName: string): React.ReactNode => {

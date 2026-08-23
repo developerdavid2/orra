@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { ChatInput } from "./chat-input";
 import type { ChatMode } from "../../hooks/use-ai-chat";
 import type { SupportedChatModelId } from "@orra/types";
+import type { ChatStatus } from "ai";
 
 interface ChatSessionShellProps {
   children: ReactNode;
@@ -13,6 +14,8 @@ interface ChatSessionShellProps {
   isLoading: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: () => void;
+  onStop?: () => void;
+  status?: ChatStatus;
   mode?: ChatMode;
   onModeChange?: (mode: ChatMode) => void;
   model?: SupportedChatModelId;
@@ -26,6 +29,8 @@ export function ChatSessionShell({
   isLoading,
   onInputChange,
   onSubmit,
+  onStop,
+  status,
   mode,
   onModeChange,
   model,
@@ -34,10 +39,8 @@ export function ChatSessionShell({
 }: ChatSessionShellProps) {
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col mx-auto">
-      {/* Messages — scrollable, with bottom padding for footer clearance */}
-      <div className="no-scrollbar space-y-4 flex-1 overflow-y-auto p-4 pb-32">
-        <div className="max-w-4xl mx-auto w-full">{children}</div>
-      </div>
+      {/* Messages — flex frame only; the child (Conversation) owns scrolling */}
+      <div className="flex min-h-0 w-full flex-1 flex-col">{children}</div>
 
       {/* Footer — anchored to the shell, stays inside the resizable panel */}
       <div className="absolute inset-x-0 bottom-0 z-10 border-t bg-background/95 backdrop-blur-sm">
@@ -49,6 +52,8 @@ export function ChatSessionShell({
               isLoading={isLoading}
               onInputChange={onInputChange}
               onSubmit={onSubmit}
+              onStop={onStop}
+              streamStatus={status}
               mode={mode}
               onModeChange={onModeChange}
               model={model}

@@ -1,13 +1,11 @@
 import { db } from "@orra/db";
 import { chatMessages } from "@orra/db/schema";
 import {
-  actToolContracts,
   CONTEXT_TOOL_SCOPE,
   DEFAULT_CHAT_MODEL_ID,
   getToolContracts,
   type StreamChatRequest,
   type StreamChatResponse,
-  type ToolContracts,
   type ToolMode,
 } from "@orra/types";
 import {
@@ -23,9 +21,12 @@ import type { Response } from "express";
 import { fetchContext } from "../context";
 import { getModelById } from "../lib/ai-provider";
 import { buildSystemPrompt } from "../lib/prompt";
+import { buildTools } from "../tools";
 import { AICoachService } from "./coach.service";
 
 const MAX_HISTORY_MESSAGES = 15;
+
+type RuntimeTools = ReturnType<typeof buildTools>;
 
 type ChatMessageMetadata = {
   mode?: ToolMode;
@@ -37,7 +38,7 @@ type ChatMessageMetadata = {
 export type OrraUIMessage = UIMessage<
   ChatMessageMetadata,
   never,
-  InferUITools<ToolContracts>
+  InferUITools<RuntimeTools>
 >;
 
 function pickTools<T extends Record<string, unknown>, K extends keyof T>(
@@ -50,7 +51,7 @@ function pickTools<T extends Record<string, unknown>, K extends keyof T>(
   ) as Pick<T, K>;
 }
 
-function scopedTools<T extends ToolContracts>(
+function scopedTools<T extends Record<string, unknown>>(
   allTools: T,
   contextType: string,
 ) {
@@ -182,18 +183,18 @@ export async function handleStreamChat(
     // is appended exactly once here.
     const originalMessages: OrraUIMessage[] = [...history, userMessage];
 
-    const systemPrompt = buildSystemPrompt(contextData, contextType);
+    const systemPrompt = buildSystemPrompt(contextData, contextType, mode);
 
     // 4. Resolve model: requested > global default. (No bare getModel() —
     // that function never existed; DEFAULT_CHAT_MODEL_ID is the fallback,
     // same role NightCode's DEFAULT_CHAT_MODEL_ID plays.)
     const resolvedModel = getModelById(requestedModel ?? DEFAULT_CHAT_MODEL_ID);
 
-    // 5. Resolve tools: primary filter by mode, secondary defense by context.
-    // NightCode only has step (mode), Orra additionally intersects with
-    // context scoping — everything downstream still only ever sees this one
-    // `filteredTools` object, same as NightCode only ever sees `tools`.
-    const allTools = actToolContracts;
+    // 5. Resolve tools: runtime tools = contracts + server-side execute
+    // (NightCode ships bare contracts because its CLI executes locally via
+    // onToolCall; Orra's data lives in Postgres, so the service executes).
+    // Primary filter by mode, secondary defense by context scope.
+    const allTools = buildTools({ userId });
     const contextTools = scopedTools(allTools, contextType);
 
     const modeToolNames = Object.keys(
@@ -276,7 +277,8 @@ export async function handleStreamChat(
       },
       onError(error) {
         console.error("[handleStreamChat] stream error:", error);
-        return error instanceof Error ? error.message : String(error); // returns string, doesn't throw — keeps stream alive
+        // Client sees only a generic message; real details stay in server logs.
+        return "Something went wrong. Try again."; // string, doesn't throw — keeps stream alive
       },
     });
 
@@ -286,6 +288,12 @@ export async function handleStreamChat(
     // upstream stream if the client disconnects mid-flight.
     res.status(uiStream.status);
     uiStream.headers.forEach((value, key) => res.setHeader(key, value));
+
+    if (!res.getHeader("cache-control")) {
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+    }
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
 
     if (uiStream.body) {
       const reader = uiStream.body.getReader();
@@ -298,7 +306,13 @@ export async function handleStreamChat(
         const pump = async (): Promise<void> => {
           const { done, value } = await reader.read();
           if (done) return;
-          res.write(value);
+          try {
+            res.write(value);
+            // no-op unless compression middleware is ever added
+            (res as unknown as { flush?: () => void }).flush?.();
+          } catch {
+            return; // write-after-disconnect: onClose cancels the read
+          }
           return pump();
         };
         await pump();
@@ -324,7 +338,8 @@ export async function handleStreamChat(
 
     return {
       success: false,
-      error: err.message,
+      // Client sees only a generic message; real details stay in server logs.
+      error: "Something went wrong. Try again.",
       code: "INTERNAL_SERVER_ERROR",
     };
   }

@@ -15,10 +15,10 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@orra/ui/components/ai-elements/prompt-input";
-import { Spinner } from "@orra/ui/components/spinner";
 import { cn } from "@orra/ui/lib/utils";
-import { ArrowUp, Eye, Wrench } from "lucide-react";
+import { ArrowUp, Eye, Square, Wrench } from "lucide-react";
 import { useMemo } from "react";
+import type { ChatStatus } from "ai";
 
 const MODE_OPTIONS: { value: ToolMode; label: string; icon: typeof Eye }[] = [
   { value: "plan", label: "Plan", icon: Eye },
@@ -36,6 +36,8 @@ interface ChatInputProps {
   isLoading: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: () => void;
+  onStop?: () => void;
+  streamStatus?: ChatStatus;
   mode?: ToolMode;
   onModeChange?: (mode: ToolMode) => void;
   model?: SupportedChatModelId;
@@ -48,6 +50,8 @@ export function ChatInput({
   isLoading,
   onInputChange,
   onSubmit,
+  onStop,
+  streamStatus,
   mode = "plan",
   onModeChange,
   model = DEFAULT_CHAT_MODEL_ID,
@@ -58,10 +62,7 @@ export function ChatInput({
     return !input?.trim() || isLoading;
   }, [input, isLoading]);
 
-  const status = useMemo(() => {
-    if (isLoading) return "streaming" as const;
-    return "ready" as const;
-  }, [isLoading]);
+  const status = streamStatus ?? (isLoading ? ("streaming" as const) : ("ready" as const));
 
   const isCompact = variant === "compact";
 
@@ -108,12 +109,13 @@ export function ChatInput({
 
   const submitButton = (
     <PromptInputSubmit
-      disabled={isSubmitDisabled}
+      disabled={isLoading ? false : isSubmitDisabled}
       status={status}
+      onStop={onStop}
       className={cn("rounded-full", isCompact && "size-7")}
     >
       {isLoading ? (
-        <Spinner className={cn(isCompact ? "size-3.5" : "size-4")} />
+        <Square className={cn("fill-current", isCompact ? "size-2.5" : "size-3")} />
       ) : (
         <ArrowUp className={cn(isCompact ? "size-3.5" : "size-4")} />
       )}
@@ -128,7 +130,7 @@ export function ChatInput({
             value={input}
             onChange={onInputChange}
             placeholder="Ask about your finances..."
-            className="min-h-15 text-sm py-1.5"
+            className="min-h-15 text-sm p-4"
           />
           {!isCompact && (
             <div className="flex items-center justify-between w-full p-2">

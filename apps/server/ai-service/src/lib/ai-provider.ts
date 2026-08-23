@@ -1,7 +1,8 @@
+import { createGateway } from "@ai-sdk/gateway";
 import { createGroq } from "@ai-sdk/groq";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import {
+  DEFAULT_CHAT_MODEL_ID,
   findSupportedChatModel,
   type SupportedChatModel,
   type SupportedChatModelId,
@@ -31,10 +32,8 @@ const groq = createGroq({ apiKey: process.env.GROQ_API_KEY ?? "" });
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY ?? "",
 });
-const aiGateway = createOpenAICompatible({
-  name: "ai-gateway",
+const vercelGateway = createGateway({
   apiKey: process.env.AI_GATEWAY_API_KEY ?? "",
-  baseURL: process.env.AI_GATEWAY_BASE_URL ?? "https://ai-gateway.vercel.sh/v1",
 });
 
 function assertUnsupportedProvider(provider: never): never {
@@ -50,11 +49,7 @@ function resolveOpenRouterModel(modelId: OpenRouterModelId): ResolvedModel {
 }
 
 function resolveAiGatewayModel(modelId: AiGatewayModelId): ResolvedModel {
-  return {
-    model: aiGateway(modelId) as any,
-    provider: "ai-gateway",
-    modelId,
-  };
+  return { model: vercelGateway(modelId), provider: "ai-gateway", modelId };
 }
 
 function resolveSupportedChatModel(model: SupportedChatModel): ResolvedModel {
@@ -79,6 +74,14 @@ export function isSupportedChatModel(
 
 export function getModelById(modelId: string): ResolvedModel {
   const model = findSupportedChatModel(modelId);
-  if (!model) throw new Error(`Unsupported model: ${modelId}`);
+  if (!model) {
+    // Stale ids happen when providers decommission models (e.g. Groq shut
+    // down llama-3.3-70b-versatile on 08/16/26) and old clients still send
+    // them. Fall back instead of failing the stream.
+    console.warn(
+      `[ai-provider] Unsupported model "${modelId}", falling back to ${DEFAULT_CHAT_MODEL_ID}`,
+    );
+    return resolveSupportedChatModel(findSupportedChatModel(DEFAULT_CHAT_MODEL_ID)!);
+  }
   return resolveSupportedChatModel(model);
 }

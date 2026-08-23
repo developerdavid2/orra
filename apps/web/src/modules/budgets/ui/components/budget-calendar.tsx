@@ -117,7 +117,7 @@ export function BudgetCalendar({ month, year }: BudgetCalendarProps) {
       </div>
 
       {/* Calendar grid */}
-      <div className="grid flex-1 min-h-0 grid-cols-7 gap-px overflow-y-auto scrollbar-thin bg-border">
+      <div className="grid flex-1 min-h-0 grid-cols-7 gap-px overflow-y-auto no-scrollbar bg-border">
         {days.map((day) => {
           const dateKey = format(day, "yyyy-MM-dd");
           const dayData = dayMap.get(dateKey);

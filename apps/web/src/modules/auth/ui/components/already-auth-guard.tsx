@@ -1,37 +1,22 @@
 "use client";
 
-import { useTRPC } from "@/trpc/trpc-client";
-import { useQuery } from "@tanstack/react-query";
+import { useProfile } from "@/hooks/queries/use-profile";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 export function AlreadyAuthGuard({ children }: { children: React.ReactNode }) {
-  const trpc = useTRPC();
   const router = useRouter();
 
-  const { data, isLoading } = useQuery({
-    ...trpc.users.profile.me.queryOptions(),
-    retry: false,
-    staleTime: 0,
-    gcTime: 0,
-  });
+  const { profile, isLoading } = useProfile();
 
   useEffect(() => {
-    if (!isLoading && data) {
+    if (!isLoading && profile) {
       router.replace("/dashboard");
     }
-  }, [isLoading, data, router]);
+  }, [isLoading, profile, router]);
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-svh items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (data) {
+  if (isLoading || profile) {
     return (
       <div className="flex min-h-svh items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
