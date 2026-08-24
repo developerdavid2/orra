@@ -21,6 +21,7 @@ import {
   markNotificationRead,
   markNotificationUnread,
   registerDevice,
+  hasActiveDeviceToken,
 } from "../services/notifications.service";
 import {
   getUserPreferences,
@@ -118,6 +119,14 @@ export const appNotificationRouter = router({
       if (!result.success) throw new Error(result.error);
       return result.data;
     }),
+
+  hasActiveDeviceToken: protectedProcedure.query(async ({ ctx }) => {
+    const result = await hasActiveDeviceToken(ctx.session.user.id);
+    if (!result.hasToken && result.tokenCount === 0) {
+      return { hasToken: false, tokenCount: 0 };
+    }
+    return result;
+  }),
 
   registerDevice: protectedProcedure
     .input(registerDeviceSchema)

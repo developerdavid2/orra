@@ -23,6 +23,8 @@ const streamRequestSchema = z
       )
       .optional()
       .default([]),
+    mode: z.enum(["plan", "act"]).optional().default("plan"),
+    model: z.string().optional(),
   })
   .passthrough();
 
@@ -51,7 +53,7 @@ export async function chatStreamHandler(
     return;
   }
 
-  const { sessionId, messages } = parseResult.data;
+  const { sessionId, messages, mode, model } = parseResult.data;
 
   const lastUserMessage = [...messages]
     .reverse()
@@ -68,8 +70,15 @@ export async function chatStreamHandler(
     return;
   }
 
+  console.log("[chatStream] Request:", {
+    userId,
+    sessionId,
+    mode,
+    model: model ?? "default",
+  });
+
   const result = await handleStreamChat(
-    { sessionId, userId, content, planTier },
+    { sessionId, userId, content, planTier, mode, model },
     res,
   );
 

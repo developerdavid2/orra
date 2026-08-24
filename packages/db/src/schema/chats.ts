@@ -28,6 +28,8 @@ export const topicTypeEnum = pgEnum("topic", [
 ]);
 export const roleEnum = pgEnum("role", ["user", "assistant"]);
 
+export const chatModeEnum = pgEnum("chat_mode", ["plan", "act"]);
+
 export const chatSessions = pgTable(
   "chat_sessions",
   {
@@ -39,6 +41,8 @@ export const chatSessions = pgTable(
     topic: topicTypeEnum("topic").default("general"),
     contextType: chatContextTypeEnum("context_type").default("general"),
     contextId: text("context_id"),
+    mode: chatModeEnum("mode").default("plan"),
+    model: text("model"),
     isActive: boolean("is_active").default(true),
     archivedAt: timestamp("archived_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

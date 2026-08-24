@@ -22,10 +22,12 @@ import type {
   UpdateBudgetInput,
 } from "@orra/types";
 import {
+  addDays,
   differenceInCalendarDays,
   endOfMonth,
   format,
   startOfMonth,
+  subDays,
 } from "date-fns";
 import {
   and,
@@ -508,27 +510,33 @@ export const BudgetsService = {
     year: number,
   ): Promise<ServiceResult<BudgetCalendarDay[]>> {
     try {
-      const monthStart = startOfMonth(new Date(year, month - 1));
-      const monthEnd = endOfMonth(new Date(year, month - 1));
+      const anchor = new Date(year, month - 1);
+      const monthStart = startOfMonth(anchor);
+      const monthEnd = endOfMonth(anchor);
 
+      // Overlap, not containment: any budget whose [startDate, endDate]
+      // intersects this month must appear, even if it starts/ends outside it.
+      // The SQL net is widened by one day on each side so timestamp timezone
+      // skew can never drop a boundary day; exact clamping happens below.
       const rows = await db
         .select()
         .from(budgets)
         .where(
           and(
             eq(budgets.userId, userId),
-            gte(budgets.startDate, monthStart),
-            lte(budgets.endDate, monthEnd),
+            lte(budgets.startDate, addDays(monthEnd, 1)),
+            gte(budgets.endDate, subDays(monthStart, 1)),
           ),
         );
 
       const enriched = await enrich(userId, rows, month, year);
 
-      // Group by day
       const dayMap = new Map<string, BudgetCalendarDay["budgets"]>();
 
-      for (const budget of enriched) {
-        const dayKey = format(budget.startDate, "yyyy-MM-dd");
+      const pushBudgetOnDay = (
+        dayKey: string,
+        budget: (typeof enriched)[number],
+      ) => {
         const list = dayMap.get(dayKey) ?? [];
         list.push({
           id: budget.id,
@@ -539,6 +547,34 @@ export const BudgetsService = {
           limitAmount: budget.limitAmount,
         });
         dayMap.set(dayKey, list);
+      };
+
+      for (const budget of enriched) {
+        // Timestamps are written as UTC midnight instants ("yyyy-MM-dd" input
+        // parsed by `new Date(str)`), but the client grid keys off LOCAL
+        // midnights. Rebuild each boundary as a local midnight carrying the
+        // same calendar date, or west-of-UTC servers shift every key a day.
+        const start = new Date(
+          budget.startDate.getUTCFullYear(),
+          budget.startDate.getUTCMonth(),
+          budget.startDate.getUTCDate(),
+        );
+        const end = new Date(
+          budget.endDate.getUTCFullYear(),
+          budget.endDate.getUTCMonth(),
+          budget.endDate.getUTCDate(),
+        );
+
+        if (end < monthStart || start > monthEnd) continue;
+
+        // Paint EVERY day of the budget's range within the viewed month.
+        let cursor = start < monthStart ? monthStart : start;
+        const last = end > monthEnd ? monthEnd : end;
+
+        while (cursor <= last) {
+          pushBudgetOnDay(format(cursor, "yyyy-MM-dd"), budget);
+          cursor = addDays(cursor, 1);
+        }
       }
 
       // Fill all days of month

@@ -15,6 +15,7 @@ import { useReducedMotion } from "@/modules/landing/lib/reduced-motion";
 import { useLandingReady } from "@/modules/landing/lib/use-landing-ready";
 import HeroBackground from "../components/hero-background";
 import { HeroMiniChart } from "../components/hero-mini-chart";
+import { useRouter } from "next/navigation";
 
 gsap.registerPlugin(MotionPathPlugin, CustomEase);
 CustomEase.create("glide", "0.8, 0, 0.2, 1");
@@ -50,6 +51,7 @@ const blurWordVariants = {
 export default function HeroSectionView() {
   const reduced = useReducedMotion();
   const ready = useLandingReady((s) => s.ready);
+  const router = useRouter();
   const heroTitleRef = useRef<HTMLDivElement>(null);
   const paragraphText =
     "ORRA connects to your bank accounts, explains your spending in plain English, and automates peer bill splits.";
@@ -100,7 +102,6 @@ export default function HeroSectionView() {
           },
           0,
         )
-
         .to(
           letters,
           {
@@ -114,7 +115,6 @@ export default function HeroSectionView() {
           },
           0.35,
         )
-
         .to(
           [glowHead, path],
           { opacity: 0, duration: 0.6, ease: "power2.out" },
@@ -135,7 +135,7 @@ export default function HeroSectionView() {
             className="relative w-full select-none text-[clamp(4rem,11vw,12rem)] font-normal leading-none tracking-[0.2em] md:tracking-[0.85em] text-section-ink mb-[10%]"
           >
             <svg
-              className="pointer-events-none absolute left-0 -top-[22%] h-[55%] w-full"
+              className="pointer-events-none absolute left-0 top-[-22%] h-[55%] w-full"
               viewBox="0 0 100 40"
               preserveAspectRatio="none"
               fill="none"
@@ -195,7 +195,11 @@ export default function HeroSectionView() {
             transition={{ duration: 0.5, delay: 0.8 }}
             className=" mt-6 flex justify-center xl:mb-0"
           >
-            <PremiumButton icon={ArrowRight} className="scale-105 py-6">
+            <PremiumButton
+              icon={ArrowRight}
+              className="scale-105 py-6"
+              onClick={() => router.push("/auth/signup")}
+            >
               GET STARTED
             </PremiumButton>
           </motion.div>

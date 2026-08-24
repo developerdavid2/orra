@@ -1,6 +1,7 @@
 import { useIntersectionObserver } from "@/hooks/ui/use-intersection-observer";
 import { Button } from "@orra/ui/components/button";
 import { Spinner } from "@orra/ui/components/spinner";
+import { cn } from "@orra/ui/lib/utils";
 import { useEffect } from "react";
 
 interface InfiniteScrollProps {
@@ -38,8 +39,13 @@ export const InfiniteScroll = ({
   ]);
 
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
-      <div ref={targetRef} className="h-1" />
+    <div
+      className={cn(
+        "flex flex-col items-center gap-4 p-4",
+        hideEndMessage && "invisible hidden",
+      )}
+    >
+      <div ref={targetRef} />
       {hasNextPage ? (
         <Button
           variant="secondary"

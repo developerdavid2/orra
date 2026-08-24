@@ -1,5 +1,7 @@
 export const TOOL_LABELS: Record<string, string> = {
-  // Consolidated query tools
+  // Consolidated tools
+  queryFinance: "Data lookup",
+  proposeChange: "Proposed change",
   queryTransactions: "Transactions",
   getSpendingAnalysis: "Spending analysis",
   queryBudgets: "Budgets",

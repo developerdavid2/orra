@@ -50,15 +50,16 @@ export function HydrateClient(props: { children: React.ReactNode }) {
 
 export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
   queryOptions: T,
-) {
+): Promise<void> {
   const queryClient = getQueryClient();
   if (queryOptions.queryKey[1]?.type === "infinite") {
-    void queryClient.prefetchInfiniteQuery(queryOptions as any);
-  } else {
-    void queryClient.prefetchQuery(queryOptions).catch(() => {
-      queryClient.removeQueries({ queryKey: queryOptions.queryKey });
-    });
+    return queryClient
+      .prefetchInfiniteQuery(queryOptions as any)
+      .catch(() => {});
   }
+  return queryClient.prefetchQuery(queryOptions).catch(() => {
+    queryClient.removeQueries({ queryKey: queryOptions.queryKey });
+  });
 }
 
 export async function prefetchInfinite<

@@ -1,4 +1,5 @@
 export * from "./accounts";
+export * from "./ai-tools";
 export * from "./auth";
 export * from "./budgets";
 export * from "./chats";
@@ -10,6 +11,7 @@ export * from "./plaid";
 export * from "./security";
 export * from "./transactions";
 export * from "./users";
+export * from "./models";
 export {};
 
 type ServiceErrorCode =

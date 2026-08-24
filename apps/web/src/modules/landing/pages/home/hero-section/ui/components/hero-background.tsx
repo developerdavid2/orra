@@ -141,8 +141,8 @@ export default function HeroBackground() {
                     <div className="h-full border-r border-white/4.5" />
                   </div>
 
-                  <div className="absolute left-0 right-0 top-[40%] z-[2] h-px bg-linear-to-r from-transparent via-white/8 to-transparent" />
-                  <div className="absolute bottom-0 left-1/2 top-0 z-[2] w-px -translate-x-1/2 bg-linear-to-b from-transparent via-white/4.5 to-transparent" />
+                  <div className="absolute left-0 right-0 top-[40%] z-2 h-px bg-linear-to-r from-transparent via-white/8 to-transparent" />
+                  <div className="absolute bottom-0 left-1/2 top-0 z-2 w-px -translate-x-1/2 bg-linear-to-b from-transparent via-white/4.5 to-transparent" />
                 </motion.div>
 
                 {/* GEOMETRIC FRAME & RINGS */}

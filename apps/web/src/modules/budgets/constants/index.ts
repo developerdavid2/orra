@@ -85,9 +85,27 @@ export const PERIOD_OPTIONS: { value: BudgetPeriod; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-export const SORT_OPTIONS = [
-  { value: "date", label: "Start date" },
-  { value: "spent", label: "Amount spent" },
-  { value: "limitAmount", label: "Budget limit" },
-  { value: "name", label: "Name" },
+export type SortChoice = {
+  field: "date" | "spent" | "limitAmount" | "name";
+  dir: "asc" | "desc";
+  label: string;
+};
+
+export const SORT_CHOICES: SortChoice[] = [
+  { field: "date", dir: "desc", label: "Start date (Newest)" },
+  { field: "date", dir: "asc", label: "Start date (Oldest)" },
+  { field: "name", dir: "asc", label: "Name (A-Z)" },
+  { field: "name", dir: "desc", label: "Name (Z-A)" },
+  { field: "spent", dir: "desc", label: "Amount Spent (Highest first)" },
+  { field: "spent", dir: "asc", label: "Amount Spent (Lowest first)" },
+  {
+    field: "limitAmount",
+    dir: "desc",
+    label: "Budget Limit (Highest first)",
+  },
+  {
+    field: "limitAmount",
+    dir: "asc",
+    label: "Budget Limit (Lowest first)",
+  },
 ];

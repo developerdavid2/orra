@@ -567,7 +567,11 @@ export function SpendingChart() {
             </Tabs>
 
             <ChartTypeSwitcher value={chartType} onChange={setChartType} />
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
+            <DateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
+              placeholder="Range"
+            />
           </div>
         </div>
       </CardHeader>

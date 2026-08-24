@@ -36,9 +36,45 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@orra/ui/components/sidebar";
+import { Skeleton } from "@orra/ui/components/skeleton";
 import { Spinner } from "@orra/ui/components/spinner";
 import { cn } from "@orra/ui/lib/utils";
 import { useSignOut } from "@/modules/auth/hooks/mutations/use-sign-out";
+
+/**
+ * Mirrors the real trigger's geometry (SidebarMenuButton size="lg" ->
+ * h-14 px-3; collapsed -> size-8 p-0) so nothing shifts when the profile
+ * query resolves.
+ */
+function DashboardUserButtonSkeleton() {
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <div
+          aria-hidden
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg bg-secondary/50",
+            collapsed ? "size-8 justify-center p-0" : "h-14 px-3 py-2",
+          )}
+        >
+          <Skeleton className="size-8 shrink-0 rounded-full" />
+          {!collapsed && (
+            <>
+              <div className="grid flex-1 gap-1.5 text-left">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-2.5 w-32" />
+              </div>
+              <Skeleton className="ml-auto size-4 shrink-0 rounded-sm" />
+            </>
+          )}
+        </div>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
 
 export function DashboardUserButton() {
   const signOut = useSignOut();
@@ -51,7 +87,7 @@ export function DashboardUserButton() {
   const { profile, isLoading } = useProfile();
 
   if (isLoading) {
-    return <p>Loading</p>;
+    return <DashboardUserButtonSkeleton />;
   }
 
   const { name, email, image } = profile ?? {};

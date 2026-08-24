@@ -19,15 +19,15 @@ import {
 import { Switch } from "@orra/ui/components/switch";
 import { cn } from "@orra/ui/lib/utils";
 import {
-  ArrowDownAZ,
-  ArrowUpAZ,
+  ArrowUpDown,
+  Check,
   Filter,
   SlidersHorizontal,
   Tag,
 } from "lucide-react";
 import { DebouncedSearchInput } from "@/components/debounced-search-input";
 import { MonthYearPicker } from "@/components/month-year-picker";
-import { HEALTH_META, PERIOD_OPTIONS, SORT_OPTIONS } from "../../constants";
+import { HEALTH_META, PERIOD_OPTIONS, SORT_CHOICES } from "../../constants";
 import { useBudgetFilters } from "../../hooks/queries/use-budget-filters";
 
 export function BudgetFilters() {
@@ -56,9 +56,6 @@ export function BudgetFilters() {
     hasActiveSorters,
   } = useBudgetFilters();
 
-  const currentSortLabel =
-    SORT_OPTIONS.find((s) => s.value === currentSortField)?.label ?? "Sort";
-
   const now = new Date();
   const listAnchor = new Date(
     currentYear ?? now.getFullYear(),
@@ -83,40 +80,41 @@ export function BudgetFilters() {
         maxYear={new Date().getFullYear()}
       />
 
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             variant={hasActiveSorters ? "default" : "outline"}
             size="sm"
             className="h-8 gap-1.5"
           >
-            {currentSortDir === "asc" ? (
-              <ArrowUpAZ className="size-3.5" />
-            ) : (
-              <ArrowDownAZ className="size-3.5" />
-            )}
-            {currentSortLabel}
+            <ArrowUpDown className="size-3.5" />
+            Sort by
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          {SORT_OPTIONS.map((opt) => (
-            <DropdownMenuItem
-              key={opt.value}
-              onClick={() =>
-                updateSort(
-                  opt.value,
-                  currentSortField === opt.value && currentSortDir === "desc"
-                    ? "asc"
-                    : "desc",
-                )
-              }
-              className={cn(
-                currentSortField === opt.value && "text-primary font-medium",
-              )}
-            >
-              {opt.label}
-            </DropdownMenuItem>
-          ))}
+        <DropdownMenuContent
+          align="end"
+          className="w-64! no-scrollbar scrollbar-none space-y-2"
+        >
+          {SORT_CHOICES.map((choice) => {
+            const selected =
+              currentSortField === choice.field &&
+              currentSortDir === choice.dir;
+            return (
+              <DropdownMenuItem
+                key={`${choice.field}-${choice.dir}`}
+                onClick={() => updateSort(choice.field, choice.dir)}
+                className={cn("gap-2", selected && "bg-accent font-medium")}
+              >
+                <Check
+                  className={cn(
+                    "size-4 shrink-0",
+                    selected ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                {choice.label}
+              </DropdownMenuItem>
+            );
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
 

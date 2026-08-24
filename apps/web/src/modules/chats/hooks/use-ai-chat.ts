@@ -1,15 +1,67 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
+import { useChat as useAiChat } from "@ai-sdk/react";
+import {
+  DefaultChatTransport,
+  type InferUITools,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type LanguageModelUsage,
+  type UIMessage,
+} from "ai";
+import {
+  DEFAULT_CHAT_MODEL_ID,
+  findSupportedChatModel,
+  type SupportedChatModelId,
+  type ToolContracts,
+  type ToolMode,
+} from "@orra/types";
 import { webEnv } from "@orra/env/web";
-import { DefaultChatTransport } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { normalizeChatMessages } from "../lib/message-parts";
 
 export type { ChatMessage } from "../lib/message-parts";
 
-export function useAIChat({ sessionId }: { sessionId: string }) {
+// ============================================================================
+// NightCode pattern: Type chain from ToolContracts → InferUITools → ChatTools
+// ============================================================================
+
+type ChatTools = {
+  [Name in keyof InferUITools<ToolContracts>]: {
+    input: InferUITools<ToolContracts>[Name]["input"];
+    output: unknown;
+  };
+};
+
+export type ChatMessageMetadata = {
+  mode?: ToolMode;
+  model?: SupportedChatModelId | string;
+  durationMs?: number;
+  usage?: LanguageModelUsage;
+};
+
+export type Message = UIMessage<ChatMessageMetadata, never, ChatTools>;
+
+export type ChatMode = ToolMode;
+
+export function useAIChat({
+  sessionId,
+  initialMode,
+  initialModel,
+}: {
+  sessionId: string;
+  initialMode?: ToolMode;
+  initialModel?: SupportedChatModelId | string;
+}) {
   const [input, setInput] = useState("");
+  const [mode, setMode] = useState<ChatMode>(initialMode ?? "plan");
+  const [model, setModel] = useState<SupportedChatModelId>(
+    // Old chats/URLs can carry decommissioned model ids (e.g. Groq shut down
+    // llama-3.3-70b-versatile on 08/16/26) — only accept ids still registered.
+    initialModel && findSupportedChatModel(initialModel)
+      ? (initialModel as SupportedChatModelId)
+      : DEFAULT_CHAT_MODEL_ID,
+  );
   const prevSessionId = useRef(sessionId);
 
   const isLocal = window.location.hostname === "localhost";
@@ -17,13 +69,30 @@ export function useAIChat({ sessionId }: { sessionId: string }) {
     ? `${webEnv.NEXT_PUBLIC_SERVER_URL}/v1/ai/chat/stream`
     : `/api/stream/chat`;
 
-  const chat = useChat({
-    id: sessionId,
-    transport: new DefaultChatTransport({
+  const transport = useMemo(() => {
+    return new DefaultChatTransport<Message>({
       api: url,
       credentials: "include",
-      body: { sessionId },
-    }),
+      prepareSendMessagesRequest({ messages }) {
+        const message = messages[messages.length - 1];
+        if (!message) throw new Error("No message to send");
+
+        return {
+          body: {
+            sessionId,
+            messages,
+            mode: message.metadata?.mode ?? mode,
+            model: message.metadata?.model ?? model,
+          },
+        };
+      },
+    });
+  }, [sessionId, url, mode, model]);
+
+  const chat = useAiChat<Message>({
+    id: sessionId,
+    transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
   });
 
   useEffect(() => {
@@ -34,10 +103,72 @@ export function useAIChat({ sessionId }: { sessionId: string }) {
     }
   }, [chat, sessionId]);
 
+  useEffect(() => {
+    if (chat.error) {
+      console.error("[useAIChat] stream error:", chat.error);
+      toast.error("Something went wrong", {
+        description: "We couldn't finish that response. Please try again.",
+      });
+    }
+  }, [chat.error]);
+
+  // Healing: stopping mid tool-execution strands a pending tool part in the
+  // last assistant message, which would keep isLoading true forever. Once the
+  // stream settles, strip those dangling parts (unless the SDK is about to
+  // auto-continue the step chain).
+  useEffect(() => {
+    if (chat.status !== "ready" && chat.status !== "error") return;
+
+    const last = chat.messages[chat.messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+
+    const isToolPart = (p: Message["parts"][number]) =>
+      typeof p.type === "string" && p.type.startsWith("tool-");
+    const isSettled = (p: Message["parts"][number]) => {
+      const state = (p as any).state;
+      return (
+        state === "output-available" ||
+        state === "output-error" ||
+        state === "output-denied" ||
+        state === "approval-responded"
+      );
+    };
+
+    const hasDanglingToolPart = last.parts?.some(
+      (p) => isToolPart(p) && !isSettled(p),
+    );
+    if (!hasDanglingToolPart) return;
+
+    if (
+      lastAssistantMessageIsCompleteWithToolCalls({ messages: chat.messages })
+    ) {
+      return;
+    }
+
+    chat.setMessages(
+      chat.messages.map((m) =>
+        m.id !== last.id
+          ? m
+          : {
+              ...m,
+              parts: m.parts.filter(
+                (p) => !(isToolPart(p) && !isSettled(p)),
+              ),
+            },
+      ),
+    );
+  }, [chat.status, chat.messages, chat.setMessages]);
+
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    chat.sendMessage({ text: trimmed });
+    chat.sendMessage({
+      text: trimmed,
+      metadata: {
+        mode,
+        model,
+      },
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -74,5 +205,10 @@ export function useAIChat({ sessionId }: { sessionId: string }) {
     setMessages: chat.setMessages,
     status: chat.status,
     sendMessage,
+    stop: chat.stop,
+    mode,
+    setMode,
+    model,
+    setModel,
   };
 }

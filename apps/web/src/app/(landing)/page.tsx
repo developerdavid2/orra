@@ -8,7 +8,7 @@ export default function Home() {
         <HeroSectionView />
       </section>
 
-      {/* <section data-blur-section id="manifesto">
+      <section data-blur-section id="manifesto">
         <ManifestoSectionView />
       </section>
 
@@ -22,7 +22,7 @@ export default function Home() {
             banking data.
           </p>
         </div>
-      </section> */}
+      </section>
     </div>
   );
 }

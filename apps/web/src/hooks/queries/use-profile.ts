@@ -1,7 +1,7 @@
 "use client";
 
 import { useTRPC } from "@/trpc/trpc-client";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 export function useProfile() {
   const trpc = useTRPC();
@@ -12,8 +12,10 @@ export function useProfile() {
   } = useQuery({
     ...trpc.users.profile.me.queryOptions(),
     retry: false,
-    staleTime: 0,
-    gcTime: 0,
+    // Cached for the hard-load gate; sign-out clears the whole query cache
+    // and profile edits invalidate via invalidateProfile.
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   return {

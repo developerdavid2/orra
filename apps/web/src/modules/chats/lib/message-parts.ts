@@ -8,6 +8,7 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   parts: ChatMessagePart[];
+  createdAt?: Date | string | null;
 };
 
 // AI SDK tool-part states map 1:1 onto our ToolPart state union.
@@ -87,6 +88,8 @@ export function normalizeChatMessages(
     id: message.id,
     role: message.role === "assistant" ? "assistant" : "user",
     parts: normalizeParts(message.parts ?? []),
+    createdAt:
+      (message as { createdAt?: Date | string | null }).createdAt ?? null,
   }));
 }
 
@@ -103,6 +106,7 @@ export function dbMessageToChatMessage(message: {
   role: string;
   content: string;
   metadata?: string | null;
+  createdAt?: Date | string | null;
 }): ChatMessage {
   let parts: ChatMessagePart[] | null = null;
   try {
@@ -136,5 +140,6 @@ export function dbMessageToChatMessage(message: {
     id: message.id,
     role: message.role === "assistant" ? "assistant" : "user",
     parts,
+    createdAt: message.createdAt ?? null,
   };
 }

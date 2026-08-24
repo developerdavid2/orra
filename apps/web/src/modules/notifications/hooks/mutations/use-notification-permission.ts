@@ -1,17 +1,20 @@
 import { getFirebaseMessaging } from "@/lib/notification-config";
+import { useDeviceRegistration } from "@/modules/notifications/hooks/queries/use-device-registration";
 import { useTRPC } from "@/trpc/trpc-client";
 import {
   deleteToken,
   getToken,
-  onMessage,
   type Messaging,
 } from "firebase/messaging";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useRegisterDevice } from "./use-register-device";
+import { useUpdateNotificationPreferences } from "@/modules/settings/pages/notifications/hooks/queries/use-update-notification-preferences";
 
 export function useNotificationPermission() {
   const trpc = useTRPC();
+  const { hasToken, refetch: refetchRegistration } = useDeviceRegistration();
+
   const [permission, setPermission] =
     useState<NotificationPermission>("default");
   const [isSupported, setIsSupported] = useState(true);
@@ -19,18 +22,22 @@ export function useNotificationPermission() {
   const [messaging, setMessaging] = useState<Messaging | null>(null);
 
   const registerDevice = useRegisterDevice();
+  const pushMutation = useUpdateNotificationPreferences([
+    "updatePreferences",
+    "push",
+  ]);
 
-  // Resolve the Messaging instance once, client-side only.
+  // Computed: true only when we have a token AND native permission granted
+  const isRegistered = hasToken && permission === "granted";
+
+  // Sync permission state from native on mount
   useEffect(() => {
-    let cancelled = false;
-
     if (!("Notification" in window)) {
       setIsSupported(false);
       return;
     }
 
     getFirebaseMessaging().then((instance) => {
-      if (cancelled) return;
       if (!instance) {
         setIsSupported(false);
         return;
@@ -38,26 +45,30 @@ export function useNotificationPermission() {
       setMessaging(instance);
       setPermission(Notification.permission);
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
+  // Listen for permission changes via visibility/focus events (no polling)
   useEffect(() => {
-    if (!messaging) return;
-    const unsub = onMessage(messaging, (payload) => {
-      window.dispatchEvent(
-        new CustomEvent("push-notification", { detail: payload }),
-      );
-      const { title, body } = payload.notification ?? {};
-      toast.info(title ?? "New notification", {
-        description: body,
-        duration: 8000,
-      });
-    });
-    return () => unsub();
-  }, [messaging]);
+    if (!("Notification" in window)) return;
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        const currentPerm = Notification.permission;
+        if (currentPerm !== permission) {
+          setPermission(currentPerm);
+        }
+        // Refetch registration status on focus (token might have been revoked)
+        refetchRegistration();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+    };
+  }, [permission, refetchRegistration]);
 
   const requestPermission = useCallback(async () => {
     if (!messaging) return null;
@@ -65,44 +76,72 @@ export function useNotificationPermission() {
     try {
       const perm = await Notification.requestPermission();
       setPermission(perm);
+
       if (perm !== "granted") {
         toast.error("Notification permission denied");
+        refetchRegistration();
         return null;
       }
-      const token = await getToken(messaging, {
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY!,
-      });
+
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY!;
+      if (!vapidKey) {
+        console.error("[requestPermission] VAPID key not configured");
+        toast.error("Push notifications not configured");
+        refetchRegistration();
+        return null;
+      }
+
+      const token = await getToken(messaging, { vapidKey });
       if (!token) {
         toast.error("Failed to get push token");
+        refetchRegistration();
         return null;
       }
+
       await registerDevice.mutateAsync({
         token,
         platform: "web",
         deviceName: navigator.userAgent.slice(0, 100),
       });
+      pushMutation.mutate({ pushEnabled: true });
       toast.success("Push notifications enabled!");
+      refetchRegistration();
       return token;
     } catch (err) {
       console.error("[requestPermission]", err);
-      toast.error("Failed to enable push notifications");
+      // Brave-specific error handling
+      const isBrave = navigator.userAgent.includes("Brave");
+      if (isBrave && err instanceof Error && err.message.includes("push service")) {
+        toast.error(
+          "Brave blocks push notifications by default. Please allow notifications in Brave settings (brave://settings/content/notifications) and disable Shields for this site."
+        );
+      } else {
+        toast.error("Failed to enable push notifications");
+      }
+      refetchRegistration();
       return null;
     } finally {
       setIsRequesting(false);
     }
-  }, [messaging, registerDevice.mutateAsync]);
+  }, [messaging, registerDevice.mutateAsync, pushMutation, refetchRegistration]);
 
   const unregister = useCallback(async () => {
     if (!messaging) return;
     await deleteToken(messaging);
     setPermission("default");
-  }, [messaging]);
+    pushMutation.mutate({ pushEnabled: false });
+    refetchRegistration();
+  }, [messaging, pushMutation, refetchRegistration]);
 
   return {
     permission,
     isSupported,
     isRequesting,
+    hasToken,
+    isRegistered,
+    isPermissionDenied: permission === "denied",
+    isRevoked: hasToken && permission === "denied",
     requestPermission,
     unregister,
-  };
+  } as const;
 }

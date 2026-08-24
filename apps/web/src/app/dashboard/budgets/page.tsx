@@ -6,6 +6,9 @@ import {
 import type { BudgetQueryState } from "@/modules/budgets/types";
 import { BudgetsView } from "@/modules/budgets/ui/views/budgets-view";
 import { HydrateClient, prefetch, trpc } from "@/trpc/trpc-server";
+import { Suspense } from "react";
+
+import { LoadingSkeleton } from "./loading-skeleton";
 
 interface PageProps {
   searchParams: Promise<{
@@ -28,7 +31,15 @@ interface PageProps {
   }>;
 }
 
-const Page = async ({ searchParams }: PageProps) => {
+const Page = ({ searchParams }: PageProps) => (
+  <Suspense fallback={<LoadingSkeleton />}>
+    <AsyncPage searchParams={searchParams} />
+  </Suspense>
+);
+
+export default Page;
+
+async function AsyncPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const now = new Date();
   const nowMonth = now.getMonth() + 1;
@@ -83,33 +94,21 @@ const Page = async ({ searchParams }: PageProps) => {
     sortDir: queryState.sortDir,
   };
 
-  prefetch(
-    trpc.payments.budgets.list.infiniteQueryOptions(listInput, {
-      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    }),
-  );
-
-  prefetch(
-    trpc.payments.budgets.calendar.queryOptions({
-      month: calMonth,
-      year: calYear,
-    }),
-  );
-
-  prefetch(
-    trpc.payments.budgets.monthlyStats.queryOptions({
-      month: statsMonth,
-      year: statsYear,
-    }),
-  );
-
-  if (params.focusBudgetId) {
+  // Only prefetch critical above-the-fold data: budget list + monthly stats
+  // calendar and optional focus budget load client-side via useSuspenseQuery
+  await Promise.all([
     prefetch(
-      trpc.payments.budgets.getById.queryOptions({
-        id: params.focusBudgetId,
+      trpc.payments.budgets.list.infiniteQueryOptions(listInput, {
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
       }),
-    );
-  }
+    ),
+    prefetch(
+      trpc.payments.budgets.monthlyStats.queryOptions({
+        month: statsMonth,
+        year: statsYear,
+      }),
+    ),
+  ]);
 
   return (
     <HydrateClient>
@@ -125,6 +124,4 @@ const Page = async ({ searchParams }: PageProps) => {
       />
     </HydrateClient>
   );
-};
-
-export default Page;
+}

@@ -243,6 +243,7 @@ export const AccountsService = {
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
       if (input.name !== undefined) updateData.name = input.name;
+      if (input.type !== undefined) updateData.type = input.type;
       if (input.subtype !== undefined) updateData.subtype = input.subtype;
       if (input.tags !== undefined) updateData.tags = input.tags;
       if (input.bankName !== undefined) updateData.bankName = input.bankName;

@@ -5,8 +5,9 @@ import {
 } from "@/modules/accounts/lib/validate-accounts-enums";
 import { AccountsView } from "@/modules/accounts/ui/views/accounts-view";
 import { HydrateClient, prefetch, trpc } from "@/trpc/trpc-server";
+import { Suspense } from "react";
 
-export const dynamic = "force-dynamic";
+import { LoadingSkeleton } from "./loading-skeleton";
 
 interface PageProps {
   searchParams: Promise<{
@@ -22,7 +23,15 @@ interface PageProps {
   }>;
 }
 
-const Page = async ({ searchParams }: PageProps) => {
+const Page = ({ searchParams }: PageProps) => (
+  <Suspense fallback={<LoadingSkeleton />}>
+    <AsyncPage searchParams={searchParams} />
+  </Suspense>
+);
+
+export default Page;
+
+async function AsyncPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const parsePositiveInt = (value: string | undefined, fallback: number) => {
     const n = Number.parseInt(value ?? "", 10);
@@ -44,17 +53,10 @@ const Page = async ({ searchParams }: PageProps) => {
     isManual: params.isManual === "true" ? true : undefined,
   };
 
-  prefetch(trpc.payments.accounts.list.queryOptions(listFilters));
-
-  prefetch(trpc.payments.accounts.aggregateByType.queryOptions());
-
-  if (params.focusAccountId) {
-    prefetch(
-      trpc.payments.accounts.getById.queryOptions({
-        accountId: params.focusAccountId,
-      }),
-    );
-  }
+  await Promise.all([
+    prefetch(trpc.payments.accounts.aggregateByType.queryOptions()),
+    prefetch(trpc.payments.accounts.list.queryOptions(listFilters)),
+  ]);
 
   return (
     <HydrateClient>
@@ -71,6 +73,4 @@ const Page = async ({ searchParams }: PageProps) => {
       />
     </HydrateClient>
   );
-};
-
-export default Page;
+}

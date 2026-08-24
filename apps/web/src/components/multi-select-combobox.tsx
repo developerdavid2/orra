@@ -206,7 +206,7 @@ export function MultiSelectCombobox(props: Props) {
           aria-invalid={ariaInvalid}
           disabled={disabled}
           className={cn(
-            "w-full justify-between rounded-xl font-normal capitalize bg-secondary/50",
+            "w-full justify-between rounded-xl font-normal bg-secondary/50",
             !selected && "text-muted-foreground",
             className,
           )}
@@ -240,7 +240,7 @@ export function MultiSelectCombobox(props: Props) {
                   key={opt.value}
                   value={opt.label}
                   className={cn(
-                    "capitalize hover:bg-accent",
+                    "hover:bg-accent",
                     opt.disabled &&
                       "opacity-40 cursor-not-allowed pointer-events-none",
                   )}

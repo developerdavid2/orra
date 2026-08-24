@@ -149,6 +149,21 @@ export function mountAiSdkChatStreamProxy(app: Express) {
           if (userId) proxyReq.setHeader("x-user-id", userId);
           if (userEmail) proxyReq.setHeader("x-user-email", userEmail);
           if (userName) proxyReq.setHeader("x-user-name", userName);
+          proxyReq.setHeader("x-accel-buffering", "no");
+          proxyReq.setHeader("accept", "text/event-stream");
+          proxyReq.on("error", () => {});
+        },
+        proxyRes: (proxyRes, req, res) => {
+          proxyRes.headers["x-accel-buffering"] = "no";
+          (res as Response).setHeader("x-accel-buffering", "no");
+          if (!(res as Response).getHeader("cache-control")) {
+            (res as Response).setHeader(
+              "cache-control",
+              "no-cache, no-transform",
+            );
+          }
+          (req as Request).socket?.on("error", () => {});
+          proxyRes.on("error", () => {});
         },
         error: (err, _req, res) => {
           logger.error(`[ai-sdk-chat proxy] error: ${err.message}`);

@@ -20,7 +20,6 @@ export function ChatSidebarArchiveSheet({
   open,
   onOpenChange,
 }: ChatSidebarArchiveSheetProps) {
-  const unarchiveSession = useUnarchiveSession();
   const { handleSelectSession } = useChatSidebarActions();
 
   const {
@@ -40,7 +39,7 @@ export function ChatSidebarArchiveSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-[320px] md:max-w-[400px] p-0 flex flex-col h-full border-l bg-sidebar"
+        className="w-full sm:max-w-[320px] md:max-w-100 p-0 flex flex-col h-full border-l bg-sidebar"
       >
         <SheetTitle className="sr-only">Archived chats</SheetTitle>
         {/* Header with back button */}
