@@ -251,14 +251,47 @@ export async function handleStreamChat(
         };
       },
       async onFinish(event) {
-        if (event.isAborted) return;
-        if (hasPendingToolCalls(event.responseMessage)) return; // don't save incomplete tool calls
+        const isAborted = event.isAborted;
+
+        // Interrupted streams still get persisted — users expect partial
+        // answers after a refresh — but dangling tool parts are stripped so
+        // reloaded history renders cleanly.
+        const settledStates = new Set([
+          "output-available",
+          "output-error",
+          "output-denied",
+          "approval-responded",
+        ]);
+        const rawParts = event.responseMessage.parts;
+        const parts = hasPendingToolCalls(event.responseMessage)
+          ? rawParts.filter((part) => {
+              const p = part as { type?: unknown; state?: unknown };
+              const isToolPart =
+                typeof p.type === "string" &&
+                (p.type.startsWith("tool-") || p.type === "dynamic-tool");
+              return !isToolPart || settledStates.has(String(p.state));
+            })
+          : rawParts;
+
+        const hasContent = parts.some((part) => {
+          const p = part as { type?: unknown; text?: unknown };
+          if (p.type === "text") {
+            return typeof p.text === "string" && p.text.trim().length > 0;
+          }
+          if (p.type === "reasoning") return true;
+          return (
+            typeof p.type === "string" &&
+            (p.type.startsWith("tool-") || p.type === "dynamic-tool")
+          );
+        });
+        if (!hasContent) return;
 
         const metadata = JSON.stringify({
           contextSnapshot: snapshot,
           mode,
           model: requestedModel ?? DEFAULT_CHAT_MODEL_ID,
           duration: Date.now() - startTime,
+          ...(isAborted ? { aborted: true } : {}),
           ...(completedUsage ? { usage: completedUsage } : {}),
         });
 
@@ -266,7 +299,7 @@ export async function handleStreamChat(
           resolvedSessionId,
           userId,
           "assistant",
-          event.responseMessage.parts,
+          parts,
           undefined,
           metadata,
         );

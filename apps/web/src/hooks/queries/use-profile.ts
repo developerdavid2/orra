@@ -12,8 +12,10 @@ export function useProfile() {
   } = useQuery({
     ...trpc.users.profile.me.queryOptions(),
     retry: false,
-    staleTime: 0,
-    gcTime: 0,
+    // Cached for the hard-load gate; sign-out clears the whole query cache
+    // and profile edits invalidate via invalidateProfile.
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   return {

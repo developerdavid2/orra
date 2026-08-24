@@ -1,4 +1,3 @@
-// app/ai-chat/[sessionId]/page.tsx
 import { CHAT_SESSION_MESSAGES } from "@/modules/chats/constants";
 import {
   ChatConversationSkeleton,
@@ -8,7 +7,6 @@ import { ChatIdView } from "@/modules/chats/ui/views/chat-id-view";
 import {
   HydrateClient,
   prefetch,
-  prefetchInfinite,
   trpc,
 } from "@/trpc/trpc-server";
 import { Suspense } from "react";
@@ -23,38 +21,74 @@ interface PageProps {
   }>;
 }
 
-export default async function Page({ params, searchParams }: PageProps) {
+const Page = ({ params, searchParams }: PageProps) => (
+  // params/searchParams resolve instantly, so the payload streams right away
+  // and this boundary takes over from loading.tsx — no ancestor skeleton.
+  <Suspense fallback={<ChatConversationSkeleton />}>
+    <ChatSessionRoute params={params} searchParams={searchParams} />
+  </Suspense>
+);
+
+export default Page;
+
+async function ChatSessionRoute({ params, searchParams }: PageProps) {
   const { sessionId } = await params;
   const { initialMessage, mode, model } = await searchParams;
 
-  prefetch(trpc.ai.coach.sessionById.queryOptions({ sessionId, limit: 50 }));
-  prefetch(
-    trpc.ai.coach.getMessages.infiniteQueryOptions(
-      { sessionId, limit: CHAT_SESSION_MESSAGES },
-      { getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined },
-    ),
+  return (
+    <Suspense
+      key={sessionId}
+      fallback={
+        initialMessage ? (
+          <ChatFreshSessionFallback message={initialMessage} />
+        ) : (
+          <ChatConversationSkeleton />
+        )
+      }
+    >
+      <SessionContent
+        sessionId={sessionId}
+        initialMessage={initialMessage}
+        mode={mode}
+        model={model}
+      />
+    </Suspense>
   );
+}
+
+async function SessionContent({
+  sessionId,
+  initialMessage,
+  mode,
+  model,
+}: {
+  sessionId: string;
+  initialMessage?: string;
+  mode?: string;
+  model?: string;
+}) {
+  await Promise.all([
+    prefetch(trpc.ai.coach.sessionById.queryOptions({ sessionId, limit: 50 })),
+    prefetch(
+      trpc.ai.coach.getMessages.infiniteQueryOptions(
+        { sessionId, limit: CHAT_SESSION_MESSAGES },
+        { getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined },
+      ),
+    ),
+  ]);
 
   return (
     <HydrateClient>
-      <Suspense
-        fallback={
-          initialMessage ? (
-            <ChatFreshSessionFallback message={initialMessage} />
-          ) : (
-            <ChatConversationSkeleton />
-          )
-        }
-      >
-        <ErrorBoundary fallback={<p>Error</p>}>
-          <ChatIdView
-            sessionId={sessionId}
-            initialMessage={initialMessage}
-            initialMode={mode === "act" ? "act" : mode === "plan" ? "plan" : undefined}
-            initialModel={model}
-          />
-        </ErrorBoundary>
-      </Suspense>
+      <ErrorBoundary fallback={<p>Error</p>}>
+        <ChatIdView
+          sessionId={sessionId}
+          initialMessage={initialMessage}
+          initialMode={
+            mode === "act" ? "act" : mode === "plan" ? "plan" : undefined
+          }
+          initialModel={model}
+        />
+      </ErrorBoundary>
     </HydrateClient>
   );
 }

@@ -359,6 +359,15 @@ export async function getActiveDeviceTokens(userId: string) {
     );
 }
 
+// ── Check if user has active device token
+export async function hasActiveDeviceToken(userId: string): Promise<{
+  hasToken: boolean;
+  tokenCount: number;
+}> {
+  const tokens = await getActiveDeviceTokens(userId);
+  return { hasToken: tokens.length > 0, tokenCount: tokens.length };
+}
+
 // ── Deactivate Device Tokens
 export async function deactivateDeviceTokens(tokens: string[]) {
   if (!tokens.length) return;

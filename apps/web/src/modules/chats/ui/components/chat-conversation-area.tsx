@@ -211,7 +211,7 @@ function SkeletonMessageRow({
       className={cn("flex gap-3", isUser && "flex-row-reverse justify-start")}
     >
       {isUser ? (
-        <Skeleton className="size-8 shrink-0 rounded-full" />
+        <Skeleton className="size-8 shrink-0 rounded-full bg-gray-200/70 dark:bg-accent" />
       ) : (
         <Skeleton className="size-8 shrink-0 rounded-full bg-primary/20" />
       )}
@@ -222,7 +222,7 @@ function SkeletonMessageRow({
         )}
       >
         <Skeleton
-          className="h-12 bg-main-tint/90"
+          className="h-12 bg-gray-200/70 dark:bg-accent"
           style={{ width: `${width}%`, maxWidth: isUser ? "60%" : "100%" }}
         />
       </div>
@@ -282,11 +282,6 @@ export function ChatConversationSkeleton() {
   );
 }
 
-/**
- * Fallback for a session arriving fresh from /dashboard/ai-chat/new.
- * Continues the exact UI that route was showing (optimistic user bubble +
- * typing indicator) so the redirect is visually seamless — no skeleton flash.
- */
 export function ChatFreshSessionFallback({ message }: { message: string }) {
   return (
     <div className="flex h-full w-full flex-col">

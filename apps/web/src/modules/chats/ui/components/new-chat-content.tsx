@@ -63,18 +63,20 @@ export function NewChatContent({ initialMessage, mode, model }: Props) {
         onInputChange={() => {}}
         onSubmit={() => {}}
       >
-        <div className="p-4 space-y-4">
-          <ChatStreamMessage
-            message={{
-              id: "optimistic-user",
-              role: "user",
-              parts: [{ type: "text", text: initialMessage }],
-            }}
-            isLast={false}
-            isStreaming={false}
-            sendMessage={() => {}}
-          />
-          <ChatTypingIndicator />
+        <div className="min-h-0 w-full mb-42">
+          <div className="max-w-4xl mx-auto w-full p-4 space-y-4">
+            <ChatStreamMessage
+              message={{
+                id: "optimistic-user",
+                role: "user",
+                parts: [{ type: "text", text: initialMessage }],
+              }}
+              isLast={false}
+              isStreaming={false}
+              sendMessage={() => {}}
+            />
+            <ChatTypingIndicator />
+          </div>
         </div>
       </ChatSessionShell>
     </div>

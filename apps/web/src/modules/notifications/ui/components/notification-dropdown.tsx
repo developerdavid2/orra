@@ -3,25 +3,44 @@
 import { Show } from "@/components/show";
 import { formatGroupLabel, getDateGroup, groupByDate } from "@/lib/utils";
 import type { AppNotification } from "@orra/types";
+import { Skeleton } from "@orra/ui/components/skeleton";
 import { cn } from "@orra/ui/lib/utils";
-import { ArrowRight, Bell, Check, Settings } from "lucide-react";
+import { ArrowRight, Bell, Check, Settings, BellDot, X } from "lucide-react";
 import Link from "next/link";
 import { useMarkAllRead } from "../../hooks/mutations/use-mark-all-read-notifications";
 import { useNotifications } from "../../hooks/queries/use-notifications";
 import { NotificationItem } from "./notification-item";
+import { useNotificationPermission } from "../../hooks/mutations/use-notification-permission";
+import { useDeviceRegistration } from "../../hooks/queries/use-device-registration";
 
 interface NotificationDropdownProps {
   onClose: () => void;
+  onOpenPermissionDialog: () => void;
+  onDismissBanner: () => void;
+  dismissedBanner: boolean;
+  shouldShowPulsatingBadge: boolean;
 }
 
-export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
-  const { data: notificationsData, isLoading } = useNotifications({
+export function NotificationDropdown({
+  onClose,
+  onOpenPermissionDialog,
+  onDismissBanner,
+  dismissedBanner,
+  shouldShowPulsatingBadge,
+}: NotificationDropdownProps) {
+  const {
+    data: notificationsData,
+    isLoading,
+    isFetching,
+  } = useNotifications({
     limit: 10,
     category: "all",
     status: "all",
     search: "",
   });
   const markAllRead = useMarkAllRead();
+
+  const { hasToken } = useDeviceRegistration();
 
   const notifications =
     notificationsData?.pages?.flatMap((page) => page.items) ?? [];
@@ -31,6 +50,9 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
   );
 
   const hasUnread = notifications.some((n) => !n.isRead);
+  const isPending = isLoading || isFetching;
+
+  const isRegisteredState = hasToken;
 
   return (
     <div className="absolute right-0 top-full mt-2.5 w-105 z-200">
@@ -77,36 +99,82 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
           </div>
         </div>
 
+        {/* Permission Banner - WhatsApp style */}
+        {!dismissedBanner && shouldShowPulsatingBadge && (
+          <div className="border-b border-primary/20 bg-primary/5 px-5 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                <BellDot className="h-5 w-5 text-primary animate-pulse" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  Push notifications are off
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  You won't receive alerts when the app is closed.
+                </p>
+              </div>
+              <button
+                onClick={onOpenPermissionDialog}
+                className="flex-shrink-0 font-medium text-sm underline underline-offset-2 text-primary hover:text-primary/80 transition-colors whitespace-nowrap"
+              >
+                Turn on
+              </button>
+              <button
+                onClick={onDismissBanner}
+                className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors p-1 ml-2"
+                aria-label="Dismiss banner"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Notifications List */}
         <div className="max-h-110 overflow-y-auto scrollbar-thin">
-          <Show
-            when={!notifications.length}
-            fallback={Object.entries(grouped).map(([group, items]) => (
-              <div key={group}>
-                <div className="px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 bg-white/30 dark:bg-white/3">
-                  {formatGroupLabel(group as any)}
+          {isPending ? (
+            <div className="p-5 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex gap-3">
+                  <Skeleton className="size-9 shrink-0 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-56" />
+                    <Skeleton className="h-3.5 w-full max-w-lg" />
+                  </div>
                 </div>
-                {(items as AppNotification[]).map((notification) => (
-                  <NotificationItem
-                    key={notification.id}
-                    notification={notification}
-                    onClick={onClose}
-                    variant="compact"
-                  />
-                ))}
-              </div>
-            ))}
-          >
-            <div className="flex flex-col items-center justify-center py-14 text-muted-foreground">
-              <div className="p-4 rounded-full bg-white/40 dark:bg-white/5 mb-4">
-                <Bell className="h-8 w-8 opacity-30" />
-              </div>
-              <p className="text-sm font-medium">No notifications yet</p>
-              <p className="text-xs mt-1 opacity-50">
-                We will notify you when something happens
-              </p>
+              ))}
             </div>
-          </Show>
+          ) : (
+            <Show
+              when={!notifications.length}
+              fallback={Object.entries(grouped).map(([group, items]) => (
+                <div key={group}>
+                  <div className="px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 bg-white/30 dark:bg-white/3">
+                    {formatGroupLabel(group as any)}
+                  </div>
+                  {(items as AppNotification[]).map((notification) => (
+                    <NotificationItem
+                      key={notification.id}
+                      notification={notification}
+                      onClick={onClose}
+                      variant="compact"
+                    />
+                  ))}
+                </div>
+              ))}
+            >
+              <div className="flex flex-col items-center justify-center py-14 text-muted-foreground">
+                <div className="p-4 rounded-full bg-white/40 dark:bg-white/5 mb-4">
+                  <Bell className="h-8 w-8 opacity-30" />
+                </div>
+                <p className="text-sm font-medium">No notifications yet</p>
+                <p className="text-xs mt-1 opacity-50">
+                  We will notify you when something happens
+                </p>
+              </div>
+            </Show>
+          )}
         </div>
 
         {/* Footer */}

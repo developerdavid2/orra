@@ -110,7 +110,7 @@ export function ChatStreamMessage({
           align="end"
           timestamp={message.createdAt ?? new Date()}
           copyText={text}
-          className="mt-0.5 pr-11"
+          className="mt-2 pr-11"
         />
       </div>
     );
@@ -206,7 +206,7 @@ export function ChatStreamMessage({
               <span className="size-1.5 rounded-full bg-foreground/30 animate-bounce [animation-delay:300ms]" />
             </div>
           )}
-        {!isStreaming && (
+        {assistantText.length > 0 && (
           <MessageMetaRow
             align="start"
             timestamp={message.createdAt ?? new Date()}

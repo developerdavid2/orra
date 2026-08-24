@@ -6,6 +6,9 @@ import {
 } from "@/modules/transactions/lib/validate-transaction-enums";
 import { TransactionsView } from "@/modules/transactions/ui/views/transactions-view";
 import { HydrateClient, prefetch, trpc } from "@/trpc/trpc-server";
+import { Suspense } from "react";
+
+import { LoadingSkeleton } from "./loading-skeleton";
 
 interface PageProps {
   searchParams: Promise<{
@@ -27,7 +30,15 @@ interface PageProps {
   }>;
 }
 
-export default async function Page({ searchParams }: PageProps) {
+const Page = ({ searchParams }: PageProps) => (
+  <Suspense fallback={<LoadingSkeleton />}>
+    <AsyncPage searchParams={searchParams} />
+  </Suspense>
+);
+
+export default Page;
+
+async function AsyncPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   const parseOptionalNumber = (value?: string) => {
@@ -67,27 +78,16 @@ export default async function Page({ searchParams }: PageProps) {
     limit,
   };
 
-  prefetch(
-    trpc.payments.transactions.list.infiniteQueryOptions(listFilters, {
-      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    }),
-  );
-
-  prefetch(
-    trpc.payments.transactions.monthlySummaries.queryOptions(
-      transactionFilters,
-    ),
-  );
-
-  prefetch(trpc.payments.accounts.listAll.queryOptions());
-
-  if (params.focusTransactionId) {
+  // Only prefetch critical above-the-fold data: transaction list + accounts for filters
+  // monthlySummaries and optional focus transaction load client-side via useSuspenseQuery
+  await Promise.all([
     prefetch(
-      trpc.payments.transactions.getById.queryOptions({
-        transactionId: params.focusTransactionId,
+      trpc.payments.transactions.list.infiniteQueryOptions(listFilters, {
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
       }),
-    );
-  }
+    ),
+    prefetch(trpc.payments.accounts.listAll.queryOptions()),
+  ]);
 
   return (
     <HydrateClient>

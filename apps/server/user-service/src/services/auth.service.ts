@@ -63,8 +63,8 @@ export const AuthService = {
       console.error("[AuthService.signIn]", err);
       return {
         success: false,
-        error: "Invalid email or password",
-        code: "UNAUTHORIZED",
+        error: "Something went wrong. Please try again.",
+        code: "INTERNAL_SERVER_ERROR",
       };
     }
   },
@@ -108,10 +108,11 @@ export const AuthService = {
       console.error("[AuthService.resetPassword]", err);
       return {
         success: false,
-        error: "Invalid or expired code",
-        code: "BAD_REQUEST",
+        error: "Something went wrong. Please try again.",
+        code: "INTERNAL_SERVER_ERROR",
       };
     }
+
   },
 
   async sendVerificationOTP(
@@ -127,8 +128,8 @@ export const AuthService = {
       console.error("[AuthService.sendVerificationOTP]", err);
       return {
         success: false,
-        error: "Failed to send code",
-        code: "BAD_REQUEST",
+        error: "Something went wrong. Please try again.",
+        code: "INTERNAL_SERVER_ERROR",
       };
     }
   },
@@ -146,8 +147,8 @@ export const AuthService = {
       console.error("[AuthService.verifyEmailOTP]", err);
       return {
         success: false,
-        error: "Invalid or expired code",
-        code: "BAD_REQUEST",
+        error: "Something went wrong. Please try again.",
+        code: "INTERNAL_SERVER_ERROR",
       };
     }
   },
@@ -184,8 +185,8 @@ export const AuthService = {
       console.error("[AuthService.signInWithOTP]", err);
       return {
         success: false,
-        error: "Invalid or expired code",
-        code: "BAD_REQUEST",
+        error: "Something went wrong. Please try again.",
+        code: "INTERNAL_SERVER_ERROR",
       };
     }
   },
@@ -222,8 +223,8 @@ export const AuthService = {
       console.error("[AuthService.signInWithSocial]", err);
       return {
         success: false,
-        error: "Social sign in failed",
-        code: "UNAUTHORIZED",
+        error: "Something went wrong. Please try again.",
+        code: "INTERNAL_SERVER_ERROR",
       };
     }
   },

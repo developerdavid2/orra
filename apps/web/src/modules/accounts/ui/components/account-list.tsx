@@ -40,9 +40,9 @@ export function AccountsList({
   const [columnVisibility, setColumnVisibility] = useState<
     Record<string, boolean>
   >({});
-  const [globalSelection, setGlobalSelection] = useState<Set<string>>(
-    new Set(),
-  );
+  const [globalSelection, setGlobalSelection] = useState<
+    Record<string, boolean>
+  >({});
 
   const { onOpenView, onOpenEdit } = useAccountDrawer();
   const { setUrl } = useAccountUrlSync();
@@ -74,12 +74,17 @@ export function AccountsList({
 
   const { bankAccounts, totalCount, pageCount } = useAccountsList(filters);
 
+  const selectedIds = useMemo(
+    () => Object.keys(globalSelection).filter((id) => globalSelection[id]),
+    [globalSelection],
+  );
+
   const deletableIds = useMemo(
     () =>
-      Array.from(globalSelection).filter(
-        (id) => bankAccounts.find((a) => a.id === id)?.isManual,
+      selectedIds.filter((id) =>
+        bankAccounts.find((a) => a.id === id)?.isManual,
       ),
-    [globalSelection, bankAccounts],
+    [selectedIds, bankAccounts],
   );
 
   const handleBatchDeleteWithConfirm = async () => {
@@ -95,7 +100,7 @@ export function AccountsList({
     if (!ok) return;
 
     await handleBatchDelete(deletableIds);
-    setGlobalSelection(new Set());
+    setGlobalSelection({});
   };
 
   const handleView = (account: BankAccount) => {
@@ -138,9 +143,9 @@ export function AccountsList({
         columnVisibility={columnVisibility}
         onColumnVisibilityChange={setColumnVisibility}
         columnNames={["name", "type", "accountNumber", "balance", "status"]}
-        selectedCount={globalSelection.size}
+        selectedCount={selectedIds.length}
         deletableCount={deletableIds.length}
-        onClearSelection={() => setGlobalSelection(new Set())}
+        onClearSelection={() => setGlobalSelection({})}
         onBatchDelete={handleBatchDeleteWithConfirm}
         isBatchDeleting={isBatchDeleting}
         showLimitSelector
@@ -170,6 +175,8 @@ export function AccountsList({
         getRowClassName={(row: BankAccount) =>
           isRowPending(row.id) ? "pointer-events-none opacity-50" : ""
         }
+        externalRowSelection={globalSelection}
+        onRowSelectionChange={setGlobalSelection}
       />
 
       <DataTablePagination

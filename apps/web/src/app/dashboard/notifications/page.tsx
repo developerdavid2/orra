@@ -1,8 +1,9 @@
 import { NotificationsView } from "@/modules/notifications/ui/views/notifications-view";
 import { HydrateClient, prefetch, trpc } from "@/trpc/trpc-server";
 import { NOTIFICATION_CATEGORY } from "@orra/types";
+import { Suspense } from "react";
 
-export const dynamic = "force-dynamic";
+import { LoadingSkeleton } from "./loading-skeleton";
 
 interface PageProps {
   searchParams: Promise<{
@@ -13,7 +14,15 @@ interface PageProps {
   }>;
 }
 
-const Page = async ({ searchParams }: PageProps) => {
+const Page = ({ searchParams }: PageProps) => (
+  <Suspense fallback={<LoadingSkeleton />}>
+    <AsyncPage searchParams={searchParams} />
+  </Suspense>
+);
+
+export default Page;
+
+async function AsyncPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   const parsePositiveInt = (value: string | undefined, fallback: number) => {
@@ -37,25 +46,25 @@ const Page = async ({ searchParams }: PageProps) => {
 
   const limit = Math.min(parsePositiveInt(params.limit, 20), 50);
 
-  prefetch(
-    trpc.notifications.appNotifications.list.infiniteQueryOptions(
-      {
-        limit,
-        search: params.search?.trim() || undefined,
-        category: normalizedCategory,
-        status,
-      },
-      {
-        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-      },
+  await Promise.all([
+    prefetch(
+      trpc.notifications.appNotifications.list.infiniteQueryOptions(
+        {
+          limit,
+          search: params.search?.trim() || undefined,
+          category: normalizedCategory,
+          status,
+        },
+        {
+          getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+        },
+      ),
     ),
-  );
+  ]);
 
   return (
     <HydrateClient>
       <NotificationsView />
     </HydrateClient>
   );
-};
-
-export default Page;
+}

@@ -93,7 +93,7 @@ export function BudgetFilters() {
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
-          className="w-56 no-scrollbar scrollbar-none"
+          className="w-64! no-scrollbar scrollbar-none space-y-2"
         >
           {SORT_CHOICES.map((choice) => {
             const selected =

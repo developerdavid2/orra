@@ -112,6 +112,53 @@ export function useAIChat({
     }
   }, [chat.error]);
 
+  // Healing: stopping mid tool-execution strands a pending tool part in the
+  // last assistant message, which would keep isLoading true forever. Once the
+  // stream settles, strip those dangling parts (unless the SDK is about to
+  // auto-continue the step chain).
+  useEffect(() => {
+    if (chat.status !== "ready" && chat.status !== "error") return;
+
+    const last = chat.messages[chat.messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+
+    const isToolPart = (p: Message["parts"][number]) =>
+      typeof p.type === "string" && p.type.startsWith("tool-");
+    const isSettled = (p: Message["parts"][number]) => {
+      const state = (p as any).state;
+      return (
+        state === "output-available" ||
+        state === "output-error" ||
+        state === "output-denied" ||
+        state === "approval-responded"
+      );
+    };
+
+    const hasDanglingToolPart = last.parts?.some(
+      (p) => isToolPart(p) && !isSettled(p),
+    );
+    if (!hasDanglingToolPart) return;
+
+    if (
+      lastAssistantMessageIsCompleteWithToolCalls({ messages: chat.messages })
+    ) {
+      return;
+    }
+
+    chat.setMessages(
+      chat.messages.map((m) =>
+        m.id !== last.id
+          ? m
+          : {
+              ...m,
+              parts: m.parts.filter(
+                (p) => !(isToolPart(p) && !isSettled(p)),
+              ),
+            },
+      ),
+    );
+  }, [chat.status, chat.messages, chat.setMessages]);
+
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;

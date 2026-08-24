@@ -2,6 +2,7 @@
 import type { Route } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 export interface Session {
   user: {
@@ -19,7 +20,7 @@ export interface Session {
   };
 }
 
-export const getServerSession = async (): Promise<Session | null> => {
+export const getServerSession = cache(async (): Promise<Session | null> => {
   try {
     const cookieStore = await cookies();
     const allCookies = cookieStore.getAll();
@@ -63,7 +64,7 @@ export const getServerSession = async (): Promise<Session | null> => {
     console.error("[getServerSession] threw:", error);
     return null;
   }
-};
+});
 
 /**
  * Use in layouts — redirects to sign-in if not authenticated.

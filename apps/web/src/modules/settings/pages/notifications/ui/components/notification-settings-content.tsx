@@ -4,16 +4,18 @@ import { useState } from "react";
 import { useNotificationPreferences } from "@/modules/settings/pages/notifications/hooks/queries/use-notification-preferences";
 import { useUpdateNotificationPreferences } from "@/modules/settings/pages/notifications/hooks/queries/use-update-notification-preferences";
 import { useNotificationPermission } from "@/modules/notifications/hooks/mutations/use-notification-permission";
+import { useDeviceRegistration } from "@/modules/notifications/hooks/queries/use-device-registration";
 import { PushNotificationsSection } from "./push-notifications-section";
 import { EmailNotificationsSection } from "./email-notifications-section";
-import { PermissionPrompt } from "./permission-prompt";
 import { AlertTypesSection } from "./alert-types-section";
+import { PermissionDialog } from "@/modules/notifications/ui/components/permission-dialog";
 import type { AlertPreferenceKey } from "../../constants";
 import { Card, CardContent, CardHeader } from "@orra/ui/components/card";
 import { Skeleton } from "@orra/ui/components/skeleton";
 
 export function NotificationSettingsContent() {
   const { data: preferences } = useNotificationPreferences();
+  const { hasToken, isLoading: registrationLoading } = useDeviceRegistration();
 
   const pushMutation = useUpdateNotificationPreferences([
     "updatePreferences",
@@ -36,28 +38,53 @@ export function NotificationSettingsContent() {
     isRequesting,
     requestPermission,
     unregister,
+    isRegistered,
   } = useNotificationPermission();
-  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [dialogVariant, setDialogVariant] = useState<"default" | "denied">("default");
 
   if (!preferences) return null;
 
+  // Computed states based on token + permission
+  // REGISTERED: hasToken && permission === 'granted'
+  // UNREGISTERED_DEFAULT: !hasToken && permission === 'default'
+  // UNREGISTERED_DENIED: !hasToken && permission === 'denied'
+  // PERMISSION_REVOKED: hasToken && permission === 'denied'
+  const isPermissionDenied = permission === "denied";
+  const isUnregistered = !hasToken;
+  const isRevoked = hasToken && isPermissionDenied;
+
   const handlePushToggle = async (checked: boolean) => {
     if (checked) {
-      if (permission !== "granted") {
-        setShowPermissionPrompt(true);
+      // Trying to enable
+      if (!isSupported) return;
+      
+      if (isPermissionDenied) {
+        // Permission denied - show denied variant dialog
+        setDialogVariant("denied");
+        setShowPermissionDialog(true);
         return;
       }
+      
+      // Permission is default or granted - try to request
+      setDialogVariant("default");
+      setShowPermissionDialog(true);
+      return;
     } else {
+      // Trying to disable - unregister
       await unregister();
     }
-    pushMutation.mutate({ pushEnabled: checked });
   };
 
-  const handlePushEnable = async () => {
-    setShowPermissionPrompt(false);
+  const handleDialogConfirm = async () => {
+    setShowPermissionDialog(false);
     const token = await requestPermission();
     if (!token) return;
-    pushMutation.mutate({ pushEnabled: true });
+    // pushMutation.mutate({ pushEnabled: true }); // requestPermission already does this
+  };
+
+  const handleDialogCancel = () => {
+    setShowPermissionDialog(false);
   };
 
   // Return a promise so AlertTypesSection can track individual toggle state
@@ -80,14 +107,22 @@ export function NotificationSettingsContent() {
     emailMutation.mutate({ emailEnabled: checked });
   };
 
+  // Determine toggle state and disabled state
+  // Use actual preference for toggle state, not derived isRegistered
+  const toggleChecked = preferences.pushEnabled ?? false;
+  const toggleDisabled = !isSupported || pushMutation.isPending || registrationLoading;
+
   return (
     <div className="space-y-6">
       <PushNotificationsSection
-        pushEnabled={preferences.pushEnabled}
+        pushEnabled={toggleChecked}
         permission={permission}
         isSupported={isSupported}
-        isLoading={pushMutation.isPending}
+        isLoading={toggleDisabled}
         onToggle={handlePushToggle}
+        isRegistered={isRegistered}
+        isPermissionDenied={isPermissionDenied}
+        isRevoked={isRevoked}
       />
 
       <AlertTypesSection
@@ -110,11 +145,12 @@ export function NotificationSettingsContent() {
         onToggle={handleEmailToggle}
       />
 
-      <PermissionPrompt
-        open={showPermissionPrompt}
+      <PermissionDialog
+        open={showPermissionDialog}
         isRequesting={isRequesting}
-        onConfirm={handlePushEnable}
-        onCancel={() => setShowPermissionPrompt(false)}
+        onConfirm={handleDialogConfirm}
+        onCancel={() => setShowPermissionDialog(false)}
+        variant={dialogVariant}
       />
     </div>
   );
