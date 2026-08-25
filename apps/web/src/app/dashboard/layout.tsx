@@ -1,17 +1,14 @@
-import { requireAuth } from "@/lib/auth-server";
-import { AuthGuard } from "@/modules/auth/ui/components/auth-guard";
+"use client";
+
 import { DashboardLayout } from "@/modules/dashboard/ui/layouts/dashboard-layout";
+import { AuthGuard } from "@/modules/auth/ui/components/auth-guard";
 
-export const dynamic = "force-dynamic";
-
-const Layout = async ({ children }: { children: React.ReactNode }) => {
-  await requireAuth();
-
+export default function DashboardLayoutWrapper({
+  children,
+}: { children: React.ReactNode }) {
   return (
     <DashboardLayout>
       <AuthGuard>{children}</AuthGuard>
     </DashboardLayout>
   );
-};
-
-export default Layout;
+}
