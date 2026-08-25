@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Force unique build ID to bust Vercel turbo cache
+  generateBuildId: async () => `build-${Date.now()}`,
 };
 
 export default nextConfig;

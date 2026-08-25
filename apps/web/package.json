@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=4096 next dev --port 3001",
-    "build": "rm -rf .next && next build",
+    "build": "rm -rf .next .turbo && next build",
     "start": "next start"
   },
   "dependencies": {
