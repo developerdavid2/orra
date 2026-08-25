@@ -1,6 +1,6 @@
 // lib/auth-server.ts
 import type { Route } from "next";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 

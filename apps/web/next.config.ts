@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
-  reactCompiler: true,
   output: "standalone",
   experimental: {
     // Router Cache: keep visited dynamic pages client-side for 120s so
