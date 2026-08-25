@@ -12,7 +12,8 @@
         "NEXT_PUBLIC_SERVER_URL",
         "NEXT_PUBLIC_AUTH_BASE_PATH"
       ],
-      "outputs": ["dist/**", ".next/**"]
+      "outputs": ["dist/**", ".next/**"],
+      "cache": false
     },
     "lint": {
       "dependsOn": ["^lint"]

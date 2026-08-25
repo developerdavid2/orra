@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd apps/web && bun run build",
+  "devCommand": "bun run dev:web",
+  "installCommand": "bun install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "build": {
+    "env": {
+      "NEXT_TELEMETRY_DISABLED": "1"
+    }
+  }
+}
