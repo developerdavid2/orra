@@ -29,6 +29,10 @@ const isDev = process.env.NODE_ENV !== "production";
 export function createAuth(config: AuthConfig) {
   const db = createDb();
 
+  // Determine cookie domain from baseURL for production
+  const baseUrl = new URL(config.baseURL);
+  const cookieDomain = isDev ? undefined : baseUrl.hostname;
+
   return betterAuth({
     basePath: "/api/auth",
     database: drizzleAdapter(db, { provider: "pg", schema }),
@@ -144,6 +148,7 @@ export function createAuth(config: AuthConfig) {
         enabled: true,
         maxAge: 60 * 5,
       },
+      cookieDomain,
     },
 
     plugins: [

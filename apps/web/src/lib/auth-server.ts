@@ -44,8 +44,11 @@ export const getServerSession = cache(async (): Promise<Session | null> => {
       process.env.NEXT_PUBLIC_APP_URL ?? "https://localhost:3001",
     );
 
+    // Use the API gateway URL for session validation to ensure consistent cookie handling
+    const gatewayUrl = process.env.NEXT_PUBLIC_SERVER_URL?.replace("/v1/trpc", "").replace("/v1", "") ?? process.env.SERVER_URL;
+    
     const response = await fetch(
-      `${process.env.SERVER_URL}/v1/auth/get-session`,
+      `${gatewayUrl}/v1/auth/get-session`,
       {
         headers: {
           cookie: cookieHeader,
