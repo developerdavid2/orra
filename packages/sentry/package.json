@@ -1,0 +1,63 @@
+{
+  "name": "@orra/sentry",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./tracing": {
+      "types": "./dist/tracing.d.ts",
+      "import": "./dist/tracing.js"
+    },
+    "./error-boundary": {
+      "types": "./dist/error-boundary.d.ts",
+      "import": "./dist/error-boundary.js"
+    },
+    "./trpc": {
+      "types": "./dist/trpc.d.ts",
+      "import": "./dist/trpc.js"
+    },
+    "./filters": {
+      "types": "./dist/filters.d.ts",
+      "import": "./dist/filters.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "check-types": "tsc --noEmit",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "@sentry/node": "^8.0.0",
+    "@sentry/profiling-node": "^8.0.0",
+    "@sentry/react": "^8.0.0",
+    "@trpc/server": "catalog:",
+    "superjson": "^2.2.1"
+  },
+  "peerDependencies": {
+    "@sentry/nextjs": "^8.0.0",
+    "@sentry/react": "^8.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@orra/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:"
+  }
+}

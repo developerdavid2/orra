@@ -13,6 +13,7 @@ import { createTRPCContext } from "@trpc/tanstack-react-query";
 import { useState } from "react";
 import superjson from "superjson";
 import { makeQueryClient } from "./query-client";
+import * as Sentry from '@sentry/nextjs';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 
@@ -55,6 +56,18 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
           false: httpLink({
             transformer: superjson,
             url: getTRPCUrl(),
+            async onError({ error, path, type }) {
+              // Report tRPC errors to Sentry
+              Sentry.captureException(error, {
+                tags: {
+                  trpcPath: path,
+                  trpcType: type,
+                },
+                extra: {
+                  trpcError: error instanceof Error ? error.message : String(error),
+                },
+              });
+            },
             fetch(url, options) {
               return fetch(url, { ...options, credentials: "include" });
             },
@@ -63,8 +76,89 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
       ],
     }),
   );
+}
 
-  return (
+export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = getQueryClient();
+
+  const [trpcClient] = useState(() =>
+    createTRPCClient<AppRouter>({
+      links: [
+        splitLink({
+          condition: (op) => op.type === "subscription",
+          true: httpSubscriptionLink({
+            url: getTRPCUrl(),
+            transformer: superjson,
+            eventSourceOptions: {
+              withCredentials: true,
+            },
+          }),
+          false: httpLink({
+            transformer: superjson,
+            url: getTRPCUrl(),
+            async onError({ error, path, type }) {
+              // Report tRPC errors to Sentry
+              Sentry.captureException(error, {
+                tags: {
+                  trpcPath: path,
+                  trpcType: type,
+                },
+                extra: {
+                  trpcError: error instanceof Error ? error.message : String(error),
+                },
+              });
+            },
+            fetch(url, options) {
+              return fetch(url, { ...options, credentials: "include" });
+            },
+          }),
+        }),
+      ],
+    }),
+  );
+}
+
+export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = getQueryClient();
+
+  const [trpcClient] = useState(() =>
+    createTRPCClient<AppRouter>({
+      links: [
+        splitLink({
+          condition: (op) => op.type === "subscription",
+          true: httpSubscriptionLink({
+            url: getTRPCUrl(),
+            transformer: superjson,
+            eventSourceOptions: {
+              withCredentials: true,
+            },
+          }),
+          false: httpLink({
+            transformer: superjson,
+            url: getTRPCUrl(),
+            async onError({ error, path, type }) {
+              // Report tRPC errors to Sentry
+              Sentry.captureException(error, {
+                tags: {
+                  trpcPath: path,
+                  trpcType: type,
+                },
+                extra: {
+                  trpcError: error instanceof Error ? error.message : String(error),
+                },
+              });
+            },
+            fetch(url, options) {
+              return fetch(url, { ...options, credentials: "include" });
+            },
+          }),
+        }),
+      ],
+    }),
+  );
+}
+
+return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         {children}

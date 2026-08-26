@@ -15,6 +15,7 @@
     "@orra/auth": "workspace:*",
     "@orra/db": "workspace:*",
     "@orra/env": "workspace:*",
+    "@orra/sentry": "workspace:*",
     "@orra/types": "workspace:*",
     "@orra/ui": "workspace:*",
     "@polar-sh/better-auth": "catalog:",
