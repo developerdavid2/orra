@@ -13,9 +13,9 @@
   },
   "main": "./src/app.ts",
   "scripts": {
-    "dev": "PORT=4003 bun run --hot src/app.ts",
+    "dev": "PORT=4003 bun run --hot --preload ./src/sentry.preload.ts src/app.ts",
     "build": "tsup",
-    "start": "node dist/app.js",
+    "start": "node --import ./dist/sentry.preload.js dist/app.js",
     "check-types": "tsc -b"
   },
   "dependencies": {
@@ -29,6 +29,7 @@
     "@orra/auth": "workspace:*",
     "@orra/config": "workspace:*",
     "@orra/db": "workspace:*",
+    "@orra/sentry": "workspace:*",
     "@orra/env": "workspace:*",
     "@orra/types": "workspace:*",
     "@trpc/server": "catalog:",

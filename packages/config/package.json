@@ -16,6 +16,7 @@
     "./tsconfig.base.json": "./tsconfig.base.json"
   },
   "dependencies": {
+    "@orra/sentry": "workspace:*",
     "@trpc/server": "catalog:",
     "better-auth": "catalog:",
     "cors": "^2.8.6",

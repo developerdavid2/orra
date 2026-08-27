@@ -7,12 +7,14 @@ import {
   createTRPCClient,
   httpLink,
   httpSubscriptionLink,
+  loggerLink,
   splitLink,
 } from "@trpc/client";
 import { createTRPCContext } from "@trpc/tanstack-react-query";
 import { useState } from "react";
 import superjson from "superjson";
 import { makeQueryClient } from "./query-client";
+import * as Sentry from '@sentry/nextjs';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 
@@ -43,6 +45,37 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
   const [trpcClient] = useState(() =>
     createTRPCClient<AppRouter>({
       links: [
+        loggerLink({
+          enabled: (opts) => opts.direction === "down",
+          logger: (opts) => {
+            if (opts.direction !== "down") return;
+
+            const result = opts.result;
+            let error: unknown = null;
+            if (result instanceof Error) {
+              error = result;
+            } else {
+              const inner = (result as { result?: { error?: unknown } }).result;
+              if (inner?.error) error = inner.error;
+            }
+            if (!error) return;
+
+            const message =
+              error instanceof Error
+                ? error.message
+                : typeof (error as { message?: unknown }).message === "string"
+                  ? (error as { message: string }).message
+                  : String(error);
+
+            Sentry.captureException(error, {
+              tags: {
+                trpcPath: opts.path,
+                trpcType: opts.type,
+              },
+              extra: { trpcError: message },
+            });
+          },
+        }),
         splitLink({
           condition: (op) => op.type === "subscription",
           true: httpSubscriptionLink({

@@ -2,6 +2,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Providers from "@/components/providers";
+import { SentryErrorBoundary } from '@orra/sentry/error-boundary';
+import * as Sentry from '@sentry/nextjs';
 import "../index.css";
 
 const fontNexa = localFont({
@@ -62,9 +64,14 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${fontNexa.variable} ${fontRostex.variable} ${fontRostexOutline.variable} antialiased`}
       >
-        <Providers>
-          <div className="grid grid-rows-[auto_1fr] h-svh">{children}</div>
-        </Providers>
+        <SentryErrorBoundary
+          fallback={<div className="flex min-h-screen items-center justify-center p-4"><p>Something went wrong. Please refresh the page.</p></div>}
+          showDialog={process.env.NODE_ENV === 'production'}
+        >
+          <Providers>
+            <div className="grid grid-rows-[auto_1fr] h-svh">{children}</div>
+          </Providers>
+        </SentryErrorBoundary>
       </body>
     </html>
   );

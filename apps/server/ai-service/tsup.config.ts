@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/app.ts"],
+  entry: ["src/app.ts", "src/sentry.preload.ts"],
   noExternal: [/@orra/],
   splitting: false,
   bundle: true,

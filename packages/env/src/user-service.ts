@@ -1,11 +1,12 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
-import { baseServerEnv, authEnv } from "./server";
+import { baseServerEnv, authEnv, sentryEnv } from "./server";
 
 export const userServiceEnv = createEnv({
   server: {
     ...baseServerEnv,
     ...authEnv,
+    ...sentryEnv,
     AUTH_PUBLIC_URL: z.url(),
     PORT: z.coerce.number().default(4001),
     TRUSTED_ORIGINS: z.string().min(1),

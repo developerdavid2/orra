@@ -15,9 +15,9 @@
     }
   },
   "scripts": {
-    "dev": "PORT=4004 bun run --hot src/app.ts",
+    "dev": "PORT=4004 bun run --hot --preload ./src/sentry.preload.ts src/app.ts",
     "build": "tsup",
-    "start": "node dist/app.js",
+    "start": "node --import ./dist/sentry.preload.js dist/app.js",
     "check-types": "tsc -b"
   },
   "dependencies": {
@@ -26,6 +26,7 @@
     "@orra/types": "workspace:*",
     "@orra/db": "workspace:*",
     "@orra/redis": "workspace:*",
+    "@orra/sentry": "workspace:*",
     "@trpc/server": "catalog:",
     "ioredis": "catalog:",
     "bullmq": "catalog:",

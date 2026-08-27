@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { baseServerEnv } from "./server";
+import { baseServerEnv, sentryEnv } from "./server";
 
 const schema = z.object({
   ...baseServerEnv,
+  ...sentryEnv,
   PORT: z.coerce.number().default(4001),
   PLAID_CLIENT_ID: z.string().min(1),
   PLAID_SECRET: z.string().min(1),

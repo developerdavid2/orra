@@ -11,6 +11,7 @@ import { usersRouter } from "./routers";
 import { createContext } from "./trpc/context";
 
 const PORT = Number(userServiceEnv.PORT) || 4001;
+
 const app = createExpressApp({
   serviceName: "user-service",
   port: PORT,

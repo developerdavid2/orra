@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/render.ts"],
+  entry: ["src/render.ts", "src/sentry.preload.ts"],
   noExternal: [/@orra/],
   external: ["ioredis", "bullmq", "rate-limiter-flexible"],
   splitting: false,

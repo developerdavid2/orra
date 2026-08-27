@@ -1,12 +1,13 @@
 import { redisEnv } from "@orra/redis/client";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
-import { baseServerEnv } from "./server";
+import { baseServerEnv, sentryEnv } from "./server";
 
 export const gatewayEnv = createEnv({
   server: {
     ...baseServerEnv,
     ...redisEnv,
+    ...sentryEnv,
     PORT: z.coerce.number().default(4000),
     TRUSTED_ORIGINS: z.string().min(1),
     USER_SERVICE_URL: z.url(),

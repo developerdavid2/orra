@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=4096 next dev --port 3001",
     "build": "rm -rf .next .turbo && next build",
-    "start": "next start"
+    "start": "next start",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.205",
@@ -15,6 +16,7 @@
     "@orra/auth": "workspace:*",
     "@orra/db": "workspace:*",
     "@orra/env": "workspace:*",
+    "@orra/sentry": "workspace:*",
     "@orra/types": "workspace:*",
     "@orra/ui": "workspace:*",
     "@polar-sh/better-auth": "catalog:",
@@ -60,7 +62,9 @@
     "superjson": "^2.2.6",
     "tailwind-scrollbar-hide": "^4.0.0",
     "zod": "catalog:",
-    "zustand": "^5.0.13"
+    "zustand": "^5.0.13",
+    "@sentry/nextjs": "^8.0.0",
+    "@sentry/react": "^8.0.0"
   },
   "devDependencies": {
     "@orra/config": "workspace:*",

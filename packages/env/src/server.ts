@@ -10,3 +10,11 @@ export const authEnv = {
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
 };
+
+export const sentryEnv = {
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENV: z.enum(["development", "staging", "production"]).optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
+  SENTRY_PROFILES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
+  SENTRY_DEBUG: z.stringbool().default(false),
+};

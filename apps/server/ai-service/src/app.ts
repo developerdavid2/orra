@@ -6,6 +6,7 @@ import { chatStreamHandler } from "./routers/chat-stream.router";
 import { createContext } from "./trpc/context";
 
 const PORT = Number(aiServiceEnv.PORT) || 4003;
+
 const app = createExpressApp({ serviceName: "ai-service", port: PORT });
 
 app.post("/chat/stream", chatStreamHandler);
