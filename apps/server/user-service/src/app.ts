@@ -1,5 +1,3 @@
-import "dotenv/config";
-
 import { createExpressApp } from "@orra/config/express-config";
 import { userServiceEnv } from "@orra/env/user-service";
 import { mountUploadThing } from "@orra/file-upload/express";
