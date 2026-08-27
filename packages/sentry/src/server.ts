@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/node";
 import type { Express } from "express";
+import { scrubEvent } from "./filters";
 
 let isInitialized = false;
 
@@ -113,47 +114,6 @@ export function captureMessage(
 
 export function flush(timeout?: number): Promise<boolean> {
   return Sentry.flush(timeout ?? 2000);
-}
-
-function scrubEvent(event: any): any {
-  const sensitiveKeys = [
-    "password",
-    "token",
-    "secret",
-    "authorization",
-    "cookie",
-    "credit_card",
-    "ssn",
-    "api_key",
-    "access_token",
-    "refresh_token",
-  ];
-
-  const scrub = (obj: any): any => {
-    if (!obj || typeof obj !== "object") return obj;
-    if (Array.isArray(obj)) return obj.map(scrub);
-
-    const scrubbed: Record<string, any> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      const lowerKey = key.toLowerCase();
-      const isSensitive = sensitiveKeys.some((k) => lowerKey.includes(k));
-      scrubbed[key] = isSensitive ? "[REDACTED]" : scrub(value);
-    }
-    return scrubbed;
-  };
-
-  if (event.exception?.values) {
-    event.exception.values = event.exception.values.map((v: any) => ({
-      ...v,
-      value: v.value ? "[REDACTED]" : v.value,
-    }));
-  }
-
-  if (event.request) event.request = scrub(event.request);
-  if (event.extra) event.extra = scrub(event.extra);
-  if (event.contexts) event.contexts = scrub(event.contexts);
-
-  return event;
 }
 
 export function setupExpressErrorHandler(app: Express): void {

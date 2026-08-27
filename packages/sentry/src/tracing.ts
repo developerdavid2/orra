@@ -10,6 +10,7 @@ export function startSpan<T>(
       name: options.name,
       op: options.op || "function",
       attributes: options.attributes,
+      parentSpan: options.parentSpan,
     },
     callback,
   );
@@ -36,6 +37,7 @@ export async function withSpan<T>(
       name,
       op: "function",
       attributes: options?.attributes,
+      parentSpan: options?.parentSpan,
     },
     async (span) => {
       try {
@@ -58,6 +60,7 @@ export function traced<T extends (...args: any[]) => Promise<any>>(
         name,
         op: options?.op || "function",
         attributes: options?.attributes,
+        parentSpan: options?.parentSpan,
       },
       async () => fn(...args),
     );

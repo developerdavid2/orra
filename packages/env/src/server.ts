@@ -16,5 +16,5 @@ export const sentryEnv = {
   SENTRY_ENV: z.enum(["development", "staging", "production"]).optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   SENTRY_PROFILES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
-  SENTRY_DEBUG: z.coerce.boolean().default(false),
+  SENTRY_DEBUG: z.stringbool().default(false),
 };

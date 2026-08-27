@@ -7,6 +7,7 @@ import {
   createTRPCClient,
   httpLink,
   httpSubscriptionLink,
+  loggerLink,
   splitLink,
 } from "@trpc/client";
 import { createTRPCContext } from "@trpc/tanstack-react-query";
@@ -44,6 +45,37 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
   const [trpcClient] = useState(() =>
     createTRPCClient<AppRouter>({
       links: [
+        loggerLink({
+          enabled: (opts) => opts.direction === "down",
+          logger: (opts) => {
+            if (opts.direction !== "down") return;
+
+            const result = opts.result;
+            let error: unknown = null;
+            if (result instanceof Error) {
+              error = result;
+            } else {
+              const inner = (result as { result?: { error?: unknown } }).result;
+              if (inner?.error) error = inner.error;
+            }
+            if (!error) return;
+
+            const message =
+              error instanceof Error
+                ? error.message
+                : typeof (error as { message?: unknown }).message === "string"
+                  ? (error as { message: string }).message
+                  : String(error);
+
+            Sentry.captureException(error, {
+              tags: {
+                trpcPath: opts.path,
+                trpcType: opts.type,
+              },
+              extra: { trpcError: message },
+            });
+          },
+        }),
         splitLink({
           condition: (op) => op.type === "subscription",
           true: httpSubscriptionLink({
@@ -56,18 +88,6 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
           false: httpLink({
             transformer: superjson,
             url: getTRPCUrl(),
-            async onError({ error, path, type }) {
-              // Report tRPC errors to Sentry
-              Sentry.captureException(error, {
-                tags: {
-                  trpcPath: path,
-                  trpcType: type,
-                },
-                extra: {
-                  trpcError: error instanceof Error ? error.message : String(error),
-                },
-              });
-            },
             fetch(url, options) {
               return fetch(url, { ...options, credentials: "include" });
             },
@@ -85,5 +105,3 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
     </QueryClientProvider>
   );
 }
-
-export { TRPCReactProvider };

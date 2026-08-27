@@ -11,10 +11,11 @@
   "scripts": {
     "build": "tsup",
     "check-types": "tsc --noEmit",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "test": "bun test"
   },
   "dependencies": {
-    "@sentry/node": "^8.0.0",
+    "@sentry/node": "^8.11.0",
     "@sentry/profiling-node": "^8.0.0",
     "@sentry/react": "^8.0.0",
     "@trpc/server": "catalog:",

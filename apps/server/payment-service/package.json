@@ -13,9 +13,9 @@
   },
   "main": "dist/serverless.js",
   "scripts": {
-    "dev": "PORT=4002 bun run --hot src/local.ts",
+    "dev": "PORT=4002 bun run --hot --preload ./src/sentry.preload.ts src/local.ts",
     "build": "tsup",
-    "start": "node dist/render.js",
+    "start": "node --import ./dist/sentry.preload.js dist/render.js",
     "check-types": "tsc -b"
   },
   "dependencies": {

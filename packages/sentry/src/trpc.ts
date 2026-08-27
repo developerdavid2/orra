@@ -15,6 +15,17 @@ export function sentryTRPCMiddleware() {
             code: result.ok ? 1 : 2,
             message: result.ok ? undefined : "TRPC error",
           });
+          if (!result.ok) {
+            Sentry.captureException(result.error, {
+              tags: { trpc_path: path, trpc_type: type },
+              extra: {
+                trpc_error:
+                  result.error instanceof Error
+                    ? result.error.message
+                    : String(result.error),
+              },
+            });
+          }
           return result;
         } catch (error) {
           span.setStatus({

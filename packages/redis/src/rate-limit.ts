@@ -41,10 +41,7 @@ function resolveKey(
   const user = (req as any).user;
   if (user?.id) return `user_${user.id}`;
 
-  const ip =
-    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ??
-    req.socket.remoteAddress ??
-    "unknown";
+  const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
   return `ip_${ip}`;
 }
 

@@ -15,6 +15,7 @@ interface SentryErrorBoundaryProps {
     componentStack: string | undefined,
     eventId: string,
   ) => void;
+  showDialog?: boolean;
 }
 
 export function SentryErrorBoundary({
@@ -22,13 +23,18 @@ export function SentryErrorBoundary({
   fallback,
   fallbackRender,
   onError,
+  showDialog,
 }: SentryErrorBoundaryProps) {
   const resolvedFallback: FallbackRender | React.ReactElement = fallbackRender
     ? ({ error, resetError }) => fallbackRender({ error, resetError })
     : (fallback ?? DefaultFallback);
 
   return (
-    <ErrorBoundary fallback={resolvedFallback} onError={onError}>
+    <ErrorBoundary
+      fallback={resolvedFallback}
+      onError={onError}
+      showDialog={showDialog}
+    >
       {children}
     </ErrorBoundary>
   );

@@ -62,6 +62,7 @@ export function scrubEvent(event: any): any {
     }
     scrubbedEvent.contexts = scrubbedContexts;
   }
+  if (event.breadcrumbs) scrubbedEvent.breadcrumbs = scrub(event.breadcrumbs);
   if (event.user) {
     scrubbedEvent.user = {
       ...event.user,
