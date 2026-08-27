@@ -26,6 +26,7 @@
     "@orra/redis": "workspace:*",
     "@orra/config": "workspace:*",
     "@orra/db": "workspace:*",
+    "@orra/sentry": "workspace:*",
     "@orra/env": "workspace:*",
     "@orra/types": "workspace:*",
     "@paralleldrive/cuid2": "^2.2.2",

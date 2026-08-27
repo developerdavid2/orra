@@ -1,9 +1,10 @@
 import { createExpressApp } from "@orra/config/express-config";
 import { gatewayEnv } from "@orra/env/gateway";
+import { initSentryServer, setupExpressErrorHandler } from "@orra/sentry";
 import { authMiddleware } from "./middleware/auth.middleware";
 import { errorHandler } from "./middleware/error.middleware";
 import { requestLogger } from "./middleware/logger.middleware";
-import { initSentryServer } from '@orra/sentry/server';
+import { globalRateLimit } from "./middleware/rate-limit.middleware";
 import {
   mountAiSdkChatStreamProxy,
   mountProxies,
@@ -12,18 +13,15 @@ import {
 
 const PORT = Number(gatewayEnv.PORT) || 4000;
 
-// Initialize Sentry for API Gateway
 initSentryServer({
   dsn: gatewayEnv.SENTRY_DSN!,
-  environment: gatewayEnv.SENTRY_ENV || 'development',
-  serviceName: 'api-gateway',
+  environment: gatewayEnv.SENTRY_ENV || "development",
+  serviceName: "api-gateway",
   tracesSampleRate: gatewayEnv.SENTRY_TRACES_SAMPLE_RATE ?? 0.2,
   profilesSampleRate: gatewayEnv.SENTRY_PROFILES_SAMPLE_RATE ?? 0.1,
   debug: gatewayEnv.SENTRY_DEBUG ?? false,
   release: process.env.APP_VERSION,
 });
-
-const PORT = Number(gatewayEnv.PORT) || 4000;
 
 const app = createExpressApp({
   serviceName: "api-gateway-service",
@@ -35,10 +33,15 @@ const app = createExpressApp({
     mountUploadThingProxy(app);
   },
 });
+
 app.use(requestLogger);
+app.use(globalRateLimit);
 
 app.use(authMiddleware);
 mountProxies(app);
+
+setupExpressErrorHandler(app);
+
 app.use(errorHandler);
 
 app.listen(PORT, () => {

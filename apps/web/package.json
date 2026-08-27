@@ -61,7 +61,9 @@
     "superjson": "^2.2.6",
     "tailwind-scrollbar-hide": "^4.0.0",
     "zod": "catalog:",
-    "zustand": "^5.0.13"
+    "zustand": "^5.0.13",
+    "@sentry/nextjs": "^8.0.0",
+    "@sentry/react": "^8.0.0"
   },
   "devDependencies": {
     "@orra/config": "workspace:*",

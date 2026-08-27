@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
+    "@types/express": "catalog:",
     "typescript": "catalog:"
   }
 }

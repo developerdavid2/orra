@@ -42,7 +42,7 @@ export function initSentryClient(config: {
     ].filter(Boolean),
     beforeSend(event) {
       if (process.env.NODE_ENV === "development") {
-        return null;
+        return event;
       }
       return scrubEvent(event);
     },

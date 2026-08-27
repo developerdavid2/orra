@@ -29,6 +29,7 @@
     "@orra/auth": "workspace:*",
     "@orra/config": "workspace:*",
     "@orra/db": "workspace:*",
+    "@orra/sentry": "workspace:*",
     "@orra/env": "workspace:*",
     "@orra/types": "workspace:*",
     "@trpc/server": "catalog:",

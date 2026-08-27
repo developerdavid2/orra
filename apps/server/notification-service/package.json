@@ -26,6 +26,7 @@
     "@orra/types": "workspace:*",
     "@orra/db": "workspace:*",
     "@orra/redis": "workspace:*",
+    "@orra/sentry": "workspace:*",
     "@trpc/server": "catalog:",
     "ioredis": "catalog:",
     "bullmq": "catalog:",

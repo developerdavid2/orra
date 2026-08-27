@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/node";
-import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import type { Express } from "express";
 
 let isInitialized = false;
 
@@ -44,14 +44,10 @@ export function initSentryServer(config: {
     tracesSampleRate: config.tracesSampleRate ?? 0.1,
     profilesSampleRate: config.profilesSampleRate ?? 0.1,
     debug: config.debug ?? false,
-    integrations: [
-      Sentry.httpIntegration(),
-      Sentry.expressIntegration(),
-      nodeProfilingIntegration(),
-    ],
+    integrations: [Sentry.httpIntegration(), Sentry.expressIntegration()],
     beforeSend(event) {
       if (process.env.NODE_ENV === "development") {
-        return null;
+        return event;
       }
       return scrubEvent(event);
     },
@@ -158,6 +154,10 @@ function scrubEvent(event: any): any {
   if (event.contexts) event.contexts = scrub(event.contexts);
 
   return event;
+}
+
+export function setupExpressErrorHandler(app: Express): void {
+  Sentry.setupExpressErrorHandler(app);
 }
 
 export { scrubEvent };

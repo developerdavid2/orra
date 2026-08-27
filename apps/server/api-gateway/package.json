@@ -21,6 +21,7 @@
     "@orra/payment-service": "workspace:*",
     "@orra/user-service": "workspace:*",
     "@orra/notification-service": "workspace:*",
+    "@orra/sentry": "workspace:*",
     "@trpc/server": "catalog:",
     "express": "catalog:",
     "morgan": "catalog:",

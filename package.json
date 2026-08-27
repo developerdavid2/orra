@@ -24,7 +24,7 @@
       "cors": "^2.8.6",
       "helmet": "^8.1.0",
       "lucide-react": "^0.546.0",
-      "uploadthing": "7.7.2",
+      "uploadthing": "^7.7.4",
       "next-themes": "^0.4.6",
       "radix-ui": "latest",
       "react": "^19.2.3",
@@ -67,11 +67,6 @@
     "db:stop": "turbo -F @orra/db db:stop",
     "db:down": "turbo -F @orra/db db:down",
     "prepare": "husky"
-  },
-  "dependencies": {
-    "@orra/env": "workspace:*",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
   },
   "devDependencies": {
     "@orra/config": "workspace:*",
