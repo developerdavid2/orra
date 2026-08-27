@@ -349,7 +349,8 @@
         "@orra/types": "workspace:*",
         "bullmq": "catalog:",
         "ioredis": "catalog:",
-        "rate-limiter-flexible": "^11.2.0",
+        "rate-limiter-flexible": "catalog:",
+        "zod": "catalog:",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -361,7 +362,7 @@
       "name": "@orra/sentry",
       "version": "0.0.0",
       "dependencies": {
-        "@sentry/node": "^8.0.0",
+        "@sentry/node": "^8.11.0",
         "@sentry/profiling-node": "^8.0.0",
         "@sentry/react": "^8.0.0",
         "@trpc/server": "catalog:",

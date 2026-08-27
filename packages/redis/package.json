@@ -13,7 +13,8 @@
     "@orra/db": "workspace:*",
     "@orra/types": "workspace:*",
     "bullmq": "catalog:",
-    "rate-limiter-flexible": "^11.2.0"
+    "zod": "catalog:",
+    "rate-limiter-flexible": "catalog:"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
