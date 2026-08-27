@@ -1,5 +1,3 @@
-import "dotenv/config";
-
 import { userServiceEnv } from "@orra/env/user-service";
 import { initSentryServer } from "@orra/sentry";
 
