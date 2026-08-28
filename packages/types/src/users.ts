@@ -20,7 +20,6 @@ export const userCreateSchema = z.object({
   emailVerified: z.boolean().default(false),
   image: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
-  planTier: z.string().default("free"),
   nickname: z.string().max(50).nullable().optional(),
   gender: z.enum(GENDER_TYPES).nullable().optional(),
   dateOfBirth: z.string().nullable().optional(),
@@ -62,7 +61,6 @@ export const userUpdateSchema = z.object({
   emailVerified: z.boolean().default(false),
   image: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
-  planTier: z.string().default("free"),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
 });
@@ -89,7 +87,6 @@ export type UserRecord = {
   image: string | null;
   imageKey: string | null;
   phone: string | null;
-  planTier: string;
   nickname: string | null;
   gender: "male" | "female" | "non_binary" | "prefer_not_to_say" | null;
   dateOfBirth: string | null;

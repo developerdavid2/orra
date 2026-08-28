@@ -36,11 +36,6 @@ export async function fetchBudgetContext(
 
   const accountIds = linkedAccounts.map((a) => a.bankAccountId);
 
-  // Per-category spend, scoped to THIS budget's own date range and its
-  // linked accounts (or all accounts, if none are linked) — the same
-  // relationship BudgetsService.loadCategories uses. The previous version
-  // compared transaction.category against budget.limitAmount, a dollar
-  // string, so it never matched anything and spend silently read as 0.
   const categories = await Promise.all(
     categoryRows.map(async (row) => {
       const conditions = [

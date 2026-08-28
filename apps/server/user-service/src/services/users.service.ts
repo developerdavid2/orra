@@ -57,29 +57,4 @@ export const UsersService = {
       };
     }
   },
-
-  async updatePlanTier(
-    id: string,
-    planTier: "free" | "pro" | "team",
-  ): Promise<ServiceResult<UserRecord>> {
-    try {
-      const result = await db
-        .update(user)
-        .set({ planTier, updatedAt: new Date() })
-        .where(eq(user.id, id))
-        .returning();
-
-      if (!result[0]) {
-        return { success: false, error: "User not found", code: "NOT_FOUND" };
-      }
-      return { success: true, data: result[0] as UserRecord };
-    } catch (err) {
-      console.error("[UsersService.updatePlanTier]", err);
-      return {
-        success: false,
-        error: "Failed to update plan",
-        code: "DB_ERROR",
-      };
-    }
-  },
 } as const;

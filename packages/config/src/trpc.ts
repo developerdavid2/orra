@@ -51,6 +51,7 @@ function sessionFromGatewayHeaders(
   const userId = nodeHeaders["x-user-id"] as string | undefined;
   const email = nodeHeaders["x-user-email"] as string | undefined;
   const name = nodeHeaders["x-user-name"] as string | undefined;
+  const planTier = nodeHeaders["x-user-plan-tier"] as string | undefined;
 
   if (userId && userId.trim()) {
     return {
@@ -58,6 +59,7 @@ function sessionFromGatewayHeaders(
         id: userId,
         email: email ?? "",
         name: name ?? "",
+        planTier: planTier ?? null,
       },
     };
   }

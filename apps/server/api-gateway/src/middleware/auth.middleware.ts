@@ -1,13 +1,13 @@
 import { gatewayEnv } from "@orra/env/gateway";
 import type { NextFunction, Request, Response } from "express";
 import { getCachedSession, setCachedSession } from "../lib/session-cache";
+import { resolvePlanTier } from "../lib/polar-tier";
 
 interface SessionResponse {
   user: {
     id: string;
     email?: string | null;
     name?: string | null;
-    planTier?: string | null;
   };
 }
 
@@ -28,7 +28,7 @@ export async function authMiddleware(
   try {
     const cached = await getCachedSession(cookie);
     if (cached) {
-      attachUserHeaders(req, cached);
+      await attachUserHeaders(req, cached);
       return next();
     }
 
@@ -52,7 +52,7 @@ export async function authMiddleware(
     const session = (await sessionRes.json()) as SessionResponse | null;
 
     if (session?.user) {
-      attachUserHeaders(req, session);
+      await attachUserHeaders(req, session);
       await setCachedSession(cookie, session);
     }
   } catch (error) {}
@@ -60,9 +60,9 @@ export async function authMiddleware(
   next();
 }
 
-function attachUserHeaders(req: Request, session: SessionResponse) {
+async function attachUserHeaders(req: Request, session: SessionResponse) {
   req.headers["x-user-id"] = session.user.id;
   req.headers["x-user-email"] = session.user.email ?? "";
   req.headers["x-user-name"] = session.user.name ?? "";
-  req.headers["x-user-plan-tier"] = session.user.planTier ?? "free";
+  req.headers["x-user-plan-tier"] = await resolvePlanTier(session.user.id);
 }

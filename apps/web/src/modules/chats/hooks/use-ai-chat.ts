@@ -44,6 +44,18 @@ export type Message = UIMessage<ChatMessageMetadata, never, ChatTools>;
 
 export type ChatMode = ToolMode;
 
+const QUOTA_EXCEEDED_MARKERS = [
+  "AI query limit reached for free tier",
+  "RATE_LIMITED",
+];
+
+function isQuotaExceededError(error: Error | undefined): boolean {
+  if (!error?.message) return false;
+  return QUOTA_EXCEEDED_MARKERS.some((marker) =>
+    error.message.includes(marker),
+  );
+}
+
 export function useAIChat({
   sessionId,
   initialMode,
@@ -54,6 +66,7 @@ export function useAIChat({
   initialModel?: SupportedChatModelId | string;
 }) {
   const [input, setInput] = useState("");
+  const [quotaReached, setQuotaReached] = useState(false);
   const [mode, setMode] = useState<ChatMode>(initialMode ?? "plan");
   const [model, setModel] = useState<SupportedChatModelId>(
     // Old chats/URLs can carry decommissioned model ids (e.g. Groq shut down
@@ -106,10 +119,16 @@ export function useAIChat({
   useEffect(() => {
     if (chat.error) {
       console.error("[useAIChat] stream error:", chat.error);
+      if (isQuotaExceededError(chat.error)) {
+        setQuotaReached(true);
+        return;
+      }
       toast.error("Something went wrong", {
         description: "We couldn't finish that response. Please try again.",
       });
+      return;
     }
+    setQuotaReached(false);
   }, [chat.error]);
 
   // Healing: stopping mid tool-execution strands a pending tool part in the
@@ -202,6 +221,7 @@ export function useAIChat({
       chat.status === "submitted" ||
       hasPendingToolCall,
     error: chat.error,
+    quotaReached,
     setMessages: chat.setMessages,
     status: chat.status,
     sendMessage,

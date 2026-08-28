@@ -1,18 +1,12 @@
 import { getFirebaseMessaging } from "@/lib/notification-config";
 import { useDeviceRegistration } from "@/modules/notifications/hooks/queries/use-device-registration";
-import { useTRPC } from "@/trpc/trpc-client";
-import {
-  deleteToken,
-  getToken,
-  type Messaging,
-} from "firebase/messaging";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useUpdateNotificationPreferences } from "@/modules/settings/pages/notifications/hooks/queries/use-update-notification-preferences";
+import { deleteToken, getToken, type Messaging } from "firebase/messaging";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useRegisterDevice } from "./use-register-device";
-import { useUpdateNotificationPreferences } from "@/modules/settings/pages/notifications/hooks/queries/use-update-notification-preferences";
 
 export function useNotificationPermission() {
-  const trpc = useTRPC();
   const { hasToken, refetch: refetchRegistration } = useDeviceRegistration();
 
   const [permission, setPermission] =
@@ -111,9 +105,13 @@ export function useNotificationPermission() {
       console.error("[requestPermission]", err);
       // Brave-specific error handling
       const isBrave = navigator.userAgent.includes("Brave");
-      if (isBrave && err instanceof Error && err.message.includes("push service")) {
+      if (
+        isBrave &&
+        err instanceof Error &&
+        err.message.includes("push service")
+      ) {
         toast.error(
-          "Brave blocks push notifications by default. Please allow notifications in Brave settings (brave://settings/content/notifications) and disable Shields for this site."
+          "Brave blocks push notifications by default. Please allow notifications in Brave settings (brave://settings/content/notifications) and disable Shields for this site.",
         );
       } else {
         toast.error("Failed to enable push notifications");
@@ -123,7 +121,12 @@ export function useNotificationPermission() {
     } finally {
       setIsRequesting(false);
     }
-  }, [messaging, registerDevice.mutateAsync, pushMutation, refetchRegistration]);
+  }, [
+    messaging,
+    registerDevice.mutateAsync,
+    pushMutation,
+    refetchRegistration,
+  ]);
 
   const unregister = useCallback(async () => {
     if (!messaging) return;

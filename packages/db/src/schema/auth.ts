@@ -30,7 +30,6 @@ export const user = pgTable("user", {
   image: text("image"),
   imageKey: text("image_key"),
   phone: text("phone"),
-  planTier: text("plan_tier").default("free").notNull(),
   nickname: varchar("nickname", { length: 50 }),
   gender: genderEnum("gender"),
   dateOfBirth: date("date_of_birth"),

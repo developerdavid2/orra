@@ -304,9 +304,16 @@ export async function handleStreamChat(
           metadata,
         );
 
-        // Credits/billing intentionally not wired up yet — Orra doesn't have
-        // a Polar-equivalent meter in place. When it does, this is where
-        // NightCode calls ingestAiUsage(), gated on `completedUsage`.
+        // Usage accounting — mirrors what NightCode calls ingestAiUsage(),
+        // gated on `completedUsage`. free-tier cap enforced via checkQuota.
+        try {
+          await AICoachService.incrementAIUsage(
+            userId,
+            completedUsage?.totalTokens ?? 0,
+          );
+        } catch (err) {
+          console.error("[handleStreamChat] usage increment failed:", err);
+        }
       },
       onError(error) {
         console.error("[handleStreamChat] stream error:", error);

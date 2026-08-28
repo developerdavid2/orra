@@ -4,9 +4,11 @@ import { locationRouter } from "./location.router";
 import { securityRouter } from "./security.router";
 import type { userFileRouter } from "../lib/uploadthing";
 import { authRouter } from "./auth.router";
+import { billingRouter } from "./billing.router";
 
 export const usersRouter = router({
   auth: authRouter,
+  billing: billingRouter,
   security: securityRouter,
   profile: profileRouter,
   location: locationRouter,

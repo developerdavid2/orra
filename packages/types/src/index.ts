@@ -1,6 +1,7 @@
 export * from "./accounts";
 export * from "./ai-tools";
 export * from "./auth";
+export * from "./billing";
 export * from "./budgets";
 export * from "./chats";
 export * from "./insights";

@@ -1,16 +1,15 @@
 "use client";
 
-import { useDeviceRegistration } from "@/modules/notifications/hooks/queries/use-device-registration";
+import { getFirebaseMessaging } from "@/lib/notification-config";
 import { useNotificationPermission } from "@/modules/notifications/hooks/mutations/use-notification-permission";
 import { useNotificationStream } from "@/modules/notifications/hooks/queries/use-notifications-stream";
-import { getFirebaseMessaging } from "@/lib/notification-config";
 import { onMessage } from "firebase/messaging";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
 export function NotificationStreamProvider() {
-  const { hasToken } = useDeviceRegistration();
-  const { permission, requestPermission } = useNotificationPermission();
+  const { permission, requestPermission, hasToken } =
+    useNotificationPermission();
 
   useNotificationStream();
 

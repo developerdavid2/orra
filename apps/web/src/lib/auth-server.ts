@@ -11,7 +11,6 @@ export interface Session {
     emailVerified: boolean;
     name: string;
     image?: string | null;
-    planTier?: string;
   };
   session: {
     id: string;

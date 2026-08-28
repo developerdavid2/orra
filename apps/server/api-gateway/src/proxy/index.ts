@@ -36,7 +36,9 @@ const withUserId = (proxyReqOpts: any, srcReq: Request) => {
   if (planTier) proxyReqOpts.headers["x-user-plan-tier"] = String(planTier);
 
   // Ensure cookies are correctly passed down so Better Auth fallback works
-  proxyReqOpts.headers["cookie"] = srcReq.headers.cookie ?? "";
+  if (srcReq.headers.cookie) {
+    proxyReqOpts.headers["cookie"] = srcReq.headers.cookie;
+  }
 
   // Forward original host information so downstream Better Auth doesn't fail origin check
   proxyReqOpts.headers["x-forwarded-host"] =
@@ -146,9 +148,11 @@ export function mountAiSdkChatStreamProxy(app: Express) {
           const userId = (req as Request).headers["x-user-id"];
           const userEmail = (req as Request).headers["x-user-email"];
           const userName = (req as Request).headers["x-user-name"];
+          const planTier = (req as Request).headers["x-user-plan-tier"];
           if (userId) proxyReq.setHeader("x-user-id", userId);
           if (userEmail) proxyReq.setHeader("x-user-email", userEmail);
           if (userName) proxyReq.setHeader("x-user-name", userName);
+          if (planTier) proxyReq.setHeader("x-user-plan-tier", planTier);
           proxyReq.setHeader("x-accel-buffering", "no");
           proxyReq.setHeader("accept", "text/event-stream");
           proxyReq.on("error", () => {});
@@ -281,7 +285,9 @@ export function mountProxies(app: Express) {
           srcReq.headers["x-forwarded-host"] ?? srcReq.headers["host"] ?? "";
         proxyReqOpts.headers["x-forwarded-proto"] =
           (srcReq.headers["x-forwarded-proto"] as string) ?? "https";
-        proxyReqOpts.headers["cookie"] = srcReq.headers.cookie ?? "";
+        if (srcReq.headers.cookie) {
+          proxyReqOpts.headers["cookie"] = srcReq.headers.cookie;
+        }
         return proxyReqOpts;
       },
 

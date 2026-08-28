@@ -6,6 +6,7 @@ import {
   db,
 } from "@orra/db";
 
+import { PLAN_LIMITS } from "@orra/types";
 import type {
   ChatMessage,
   ChatMessagesParamsInput,
@@ -13,23 +14,31 @@ import type {
   ChatSessionsFilterInput,
   PaginatedChatMessages,
   PaginatedChatSessions,
+  PlanTier,
   ServiceResult,
   StartOrCreateChatSessionInput,
 } from "@orra/types";
 import type { UIMessage } from "ai";
 import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 
+function normalizePlanTier(
+  planTier: string | null | undefined,
+): PlanTier {
+  return planTier === "free" || planTier === "pro" || planTier === "team"
+    ? planTier
+    : "free";
+}
+
 async function checkAIQuota(
   userId: string,
-  planTier: string,
+  planTier: string | null | undefined,
 ): Promise<ServiceResult<boolean>> {
-  if (planTier !== "free") {
-    return { success: true, data: true };
-  }
+  const tier = normalizePlanTier(planTier);
+  const limit = PLAN_LIMITS[tier].queries;
 
   const now = new Date();
   const [usage] = await db
-    .select()
+    .select({ queryCount: aiUsage.queryCount })
     .from(aiUsage)
     .where(
       and(
@@ -44,12 +53,45 @@ async function checkAIQuota(
     return { success: true, data: true };
   }
 
-  // Free tier: 20 queries/month
-  if (usage.queryCount >= 20) {
+  if (usage.queryCount >= limit) {
     return {
       success: false,
-      error:
-        "AI query limit reached for free tier. Upgrade to Pro for unlimited queries.",
+      error: "AI query limit reached for your plan. Upgrade your plan for more queries.",
+      code: "RATE_LIMITED",
+    };
+  }
+
+  return { success: true, data: true };
+}
+
+async function checkInsightQuota(
+  userId: string,
+  planTier: string | null | undefined,
+): Promise<ServiceResult<boolean>> {
+  const tier = normalizePlanTier(planTier);
+  const limit = PLAN_LIMITS[tier].insights;
+
+  const now = new Date();
+  const [usage] = await db
+    .select({ insightCount: aiUsage.insightCount })
+    .from(aiUsage)
+    .where(
+      and(
+        eq(aiUsage.userId, userId),
+        eq(aiUsage.month, now.getMonth() + 1),
+        eq(aiUsage.year, now.getFullYear()),
+      ),
+    )
+    .limit(1);
+
+  if (!usage) {
+    return { success: true, data: true };
+  }
+
+  if (usage.insightCount >= limit) {
+    return {
+      success: false,
+      error: "AI insight limit reached for your plan. Upgrade your plan for more insights.",
       code: "RATE_LIMITED",
     };
   }
@@ -512,9 +554,16 @@ export const AICoachService = {
 
   async checkQuota(
     userId: string,
-    planTier: string,
+    planTier: string | null | undefined,
   ): Promise<ServiceResult<boolean>> {
     return checkAIQuota(userId, planTier);
+  },
+
+  async checkInsightQuota(
+    userId: string,
+    planTier: string | null | undefined,
+  ): Promise<ServiceResult<boolean>> {
+    return checkInsightQuota(userId, planTier);
   },
 
   async getUsage(userId: string): Promise<ServiceResult<AIUsageRecord | null>> {
@@ -591,6 +640,56 @@ export const AICoachService = {
       return {
         success: false,
         error: "Failed to increment usage",
+        code: "INTERNAL_SERVER_ERROR",
+      };
+    }
+  },
+
+  async incrementInsightUsage(
+    userId: string,
+  ): Promise<ServiceResult<void>> {
+    try {
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+
+      const [existing] = await db
+        .select({ id: aiUsage.id, insightCount: aiUsage.insightCount })
+        .from(aiUsage)
+        .where(
+          and(
+            eq(aiUsage.userId, userId),
+            eq(aiUsage.month, month),
+            eq(aiUsage.year, year),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(aiUsage)
+          .set({
+            insightCount: existing.insightCount + 1,
+            lastQueryAt: now,
+            updatedAt: now,
+          })
+          .where(eq(aiUsage.id, existing.id));
+      } else {
+        await db.insert(aiUsage).values({
+          userId,
+          month,
+          year,
+          insightCount: 1,
+          lastQueryAt: now,
+        });
+      }
+
+      return { success: true, data: undefined };
+    } catch (err) {
+      console.error("[AICoachService.incrementInsightUsage]", err);
+      return {
+        success: false,
+        error: "Failed to increment insight usage",
         code: "INTERNAL_SERVER_ERROR",
       };
     }

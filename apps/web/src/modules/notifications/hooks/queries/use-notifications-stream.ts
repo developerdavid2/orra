@@ -28,9 +28,9 @@ export function useNotificationStream() {
     }),
   );
 
-  useEffect(() => {
-    console.log("[notification subscription] status:", subscription.status);
-  }, [subscription.status]);
+  // useEffect(() => {
+  //   console.log("[notification subscription] status:", subscription.status);
+  // }, [subscription.status]);
 
   return subscription;
 }
