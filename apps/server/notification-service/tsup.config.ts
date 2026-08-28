@@ -2,7 +2,7 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: ["src/app.ts", "src/sentry.preload.ts"],
-  noExternal: [/@orra/],
+  noExternal: [/@orra/, "bullmq", "ioredis"],
   splitting: false,
   bundle: true,
   outDir: "dist",
@@ -13,8 +13,8 @@ export default defineConfig({
   target: "node20",
   banner: {
     js: `
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+import { createRequire as _createRequire } from 'module';
+const require = _createRequire(import.meta.url);
 `,
   },
 });

@@ -11,4 +11,10 @@ export default defineConfig({
   sourcemap: false,
   format: ["esm"],
   target: "node20",
+  banner: {
+    js: `
+import { createRequire as _createRequire } from 'module';
+const require = _createRequire(import.meta.url);
+`,
+  },
 });

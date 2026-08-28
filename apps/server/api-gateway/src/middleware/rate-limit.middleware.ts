@@ -1,4 +1,4 @@
-import { createRateLimiter, createRateLimitMiddleware } from "@orra/redis";
+import { createRateLimiter, createRateLimitMiddleware } from "@orra/redis/rate-limit";
 import { logger } from "../utils/logger";
 
 const globalLimiter = createRateLimiter({
