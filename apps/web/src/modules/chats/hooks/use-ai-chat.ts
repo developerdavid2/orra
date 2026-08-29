@@ -45,7 +45,7 @@ export type Message = UIMessage<ChatMessageMetadata, never, ChatTools>;
 export type ChatMode = ToolMode;
 
 const QUOTA_EXCEEDED_MARKERS = [
-  "AI query limit reached for free tier",
+  "AI query limit reached",
   "RATE_LIMITED",
 ];
 

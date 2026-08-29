@@ -12,14 +12,18 @@ import type { Product } from "@polar-sh/sdk/models/components/product.js";
 import { and, eq } from "drizzle-orm";
 import { polarApi } from "../lib/auth";
 
-const TIER_BY_METADATA = (product: Product): "pro" | "team" | null => {
+const TIER_BY_METADATA = (product: Product): PlanTier | null => {
   const raw = product.metadata?.["orra_tier"];
-  return raw === "pro" || raw === "team" ? raw : null;
+  if (raw === "free" || raw === "pro" || raw === "team") return raw;
+  return null;
 };
 
-const TIER_BY_NAME = (product: Product): "pro" | "team" | null => {
+const TIER_BY_NAME = (product: Product): PlanTier | null => {
   const name = product.name.toLowerCase();
-  return name.includes("team") ? "team" : name.includes("pro") ? "pro" : null;
+  if (name.includes("team")) return "team";
+  if (name.includes("pro")) return "pro";
+  if (name.includes("free")) return "free";
+  return null;
 };
 
 function periodOf(interval?: string | null): PlanPeriod {
@@ -39,8 +43,18 @@ async function getProducts(): Promise<Product[]> {
   return products;
 }
 
-function tierForProduct(product: Product): "pro" | "team" {
+function tierForProduct(product: Product): PlanTier {
   return TIER_BY_METADATA(product) ?? TIER_BY_NAME(product) ?? "pro";
+}
+
+function highlightedOf(product: Product): boolean {
+  return product.metadata?.["highlighted"] === true;
+}
+
+function featuresOf(product: Product): string[] {
+  return (product.benefits ?? [])
+    .map((b) => (b as { description?: string }).description)
+    .filter((d): d is string => Boolean(d));
 }
 
 export const BillingService = {
@@ -53,6 +67,7 @@ export const BillingService = {
       let period: PlanPeriod | null = null;
       let subscriptionId: string | null = null;
       let currentPeriodEnd: string | null = null;
+      let currentProductId: string | null = null;
 
       if (active) {
         const products = await getProducts();
@@ -67,6 +82,7 @@ export const BillingService = {
         currentPeriodEnd = active.currentPeriodEnd
           ? new Date(active.currentPeriodEnd).toISOString()
           : null;
+        currentProductId = active.productId;
       }
 
       const now = new Date();
@@ -93,6 +109,7 @@ export const BillingService = {
           period,
           subscriptionId,
           currentPeriodEnd,
+          currentProductId,
           quota: {
             used: usage?.queryCount ?? 0,
             limit: PLAN_LIMITS[planTier].queries,
@@ -120,17 +137,34 @@ export const BillingService = {
 
       for (const product of products) {
         const tier = tierForProduct(product);
+        if (!tier) continue;
+
         const price = product.prices?.[0] as
-          | { amount?: number; currency?: string }
+          | {
+              amount?: number;
+              priceAmount?: number;
+              recurringInterval?: string | null;
+              currency?: string;
+            }
           | undefined;
-        const rawInterval = "recurringInterval" in (price ?? {})
-          ? (
-              price as unknown as {
-                recurringInterval?: "month" | "year";
-              }
-            ).recurringInterval
-          : undefined;
-        const period = periodOf(rawInterval ?? "month");
+
+        const rawInterval =
+          product.recurringInterval ?? price?.recurringInterval ?? "month";
+        const period = periodOf(rawInterval);
+        const cents = price?.priceAmount ?? price?.amount ?? 0;
+        const priceAmount = cents / 100; // Polar amounts are in cents
+        const currency = price?.currency ?? "USD";
+
+        const formatter = new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        });
+        const priceLabel =
+          priceAmount === 0
+            ? "$0 forever"
+            : `${formatter.format(priceAmount)}${period === "yearly" ? " / year" : " / month"}`;
 
         plans.push({
           productId: product.id,
@@ -138,7 +172,11 @@ export const BillingService = {
           slug: tier,
           tier,
           period,
-          priceLabel: `$${price?.amount ?? 0}${period === "yearly" ? " / year" : " / month"}`,
+          priceLabel,
+          price: priceAmount,
+          highlighted: highlightedOf(product),
+          features: featuresOf(product),
+          description: product.description ?? "",
         });
       }
 
@@ -151,5 +189,32 @@ export const BillingService = {
         code: "DB_ERROR",
       };
     }
+  },
+
+  async checkoutUrl(
+    userId: string,
+    productId: string,
+  ): Promise<ServiceResult<{ url: string }>> {
+    const result = await polarApi.createCheckout(userId, productId);
+    if (!result) {
+      return {
+        success: false,
+        error: "Failed to start checkout",
+        code: "DB_ERROR",
+      };
+    }
+    return { success: true, data: result };
+  },
+
+  async portalUrl(userId: string): Promise<ServiceResult<{ url: string }>> {
+    const result = await polarApi.createCustomerPortalSession(userId);
+    if (!result) {
+      return {
+        success: false,
+        error: "Failed to load billing portal",
+        code: "DB_ERROR",
+      };
+    }
+    return { success: true, data: result };
   },
 };

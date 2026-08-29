@@ -11,14 +11,13 @@ export function usePortal() {
       if (res.error) {
         throw new Error(res.error.message ?? "Failed to open customer portal");
       }
-      const { url } = res as unknown as { url: string };
-      if (url) {
-        window.location.href = url;
-      }
+      return res.data?.url ?? null;
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error ? error.message : "Failed to open customer portal",
+        error instanceof Error
+          ? error.message
+          : "Failed to open customer portal",
       );
     },
   });

@@ -38,15 +38,15 @@ async function getProductsByMetadata(): Promise<Map<string, unknown>> {
       sorting: ["price_amount"],
     });
     for await (const page of pages) {
-      const pageItems =
-        (page as unknown as { result?: { items?: Array<{ id: string }> } })
-          .result?.items ?? [];
+      const pageItems = page.result?.items ?? [];
       for (const item of pageItems) {
         items.set(item.id, item);
       }
     }
   } catch (err) {
     console.error("[gateway.polar] products.list failed", err);
+    if (productsCache) return productsCache.items;
+    return items;
   }
 
   productsCache = { items, at: Date.now() };

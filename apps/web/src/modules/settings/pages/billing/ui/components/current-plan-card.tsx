@@ -3,7 +3,7 @@
 import { Badge } from "@orra/ui/components/badge";
 import { Card, CardContent, CardHeader } from "@orra/ui/components/card";
 import { Crown } from "lucide-react";
-import { PLANS, type PlanSlug } from "../../constants";
+import type { PlanSlug } from "../../constants";
 import { PlanUsage } from "./plan-usage";
 
 interface Quota {
@@ -12,6 +12,9 @@ interface Quota {
 }
 
 interface CurrentPlanCardProps {
+  name: string;
+  description: string;
+  priceLabel: string;
   planTier: PlanSlug;
   quota: Quota;
   insights: Quota;
@@ -19,16 +22,18 @@ interface CurrentPlanCardProps {
 }
 
 export function CurrentPlanCard({
+  name,
+  description,
+  priceLabel,
   planTier,
   quota,
   insights,
   period,
 }: CurrentPlanCardProps) {
-  const plan = PLANS.find((p) => p.slug === planTier) ?? PLANS[0];
   const isFree = planTier === "free";
 
   return (
-    <Card>
+    <Card className="bg-main-tint">
       <CardHeader className="pb-0">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-lg bg-accent">
@@ -45,17 +50,17 @@ export function CurrentPlanCard({
               </Badge>
             </div>
             <p className="truncate text-xs text-muted-foreground">
-              {plan.description}
+              {description}
             </p>
           </div>
 
           <div className="text-right">
             <p className="text-lg font-semibold tracking-tight">
-              {plan.name}
+              {name}
               {!isFree && period ? ` · ${period}` : ""}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isFree ? `${plan.monthly} ${plan.monthlySuffix}` : ""}
+              {isFree ? priceLabel : ""}
             </p>
           </div>
         </div>

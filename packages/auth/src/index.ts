@@ -33,7 +33,6 @@ const isDev = process.env.NODE_ENV !== "production";
 export function createAuth(config: AuthConfig) {
   const db = createDb();
 
-  // Determine cookie domain from baseURL for production
   const baseUrl = new URL(config.baseURL);
   const cookieDomain = isDev ? undefined : baseUrl.hostname;
 
@@ -177,7 +176,7 @@ export function createAuth(config: AuthConfig) {
             polar({
               client: new Polar({
                 accessToken: config.polar.accessToken,
-                server: config.polar.server ?? "sandbox",
+                server: config.polar.server!,
               }),
               createCustomerOnSignUp: true,
               use: [

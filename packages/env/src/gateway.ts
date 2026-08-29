@@ -15,7 +15,7 @@ export const gatewayEnv = createEnv({
     AI_SERVICE_URL: z.url(),
     NOTIFICATION_SERVICE_URL: z.url(),
     POLAR_ACCESS_TOKEN: z.string().optional(),
-    POLAR_SERVER: z.enum(["sandbox", "production"]).optional().default("sandbox"),
+    POLAR_SERVER: z.enum(["sandbox", "production"]),
   },
   runtimeEnv: process.env,
 });

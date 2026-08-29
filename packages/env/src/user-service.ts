@@ -16,7 +16,7 @@ export const userServiceEnv = createEnv({
     SMTP_USER: z.email(),
     SMTP_PASS: z.string().min(1),
     POLAR_ACCESS_TOKEN: z.string().optional(),
-    POLAR_SERVER: z.enum(["sandbox", "production"]).optional().default("sandbox"),
+    POLAR_SERVER: z.enum(["sandbox", "production"]),
     POLAR_SUCCESS_URL: z.string().optional(),
     POLAR_RETURN_URL: z.string().optional(),
   },

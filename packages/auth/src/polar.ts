@@ -8,6 +8,11 @@ export type PolarApi = {
   getCustomerState(userId: string): Promise<CustomerState | null>;
   getProduct(productId: string): Promise<Product | null>;
   listProducts(): Promise<Product[] | null>;
+  createCheckout(
+    userId: string,
+    productId: string,
+  ): Promise<{ url: string } | null>;
+  createCustomerPortalSession(userId: string): Promise<{ url: string } | null>;
 };
 
 const notConfigured: PolarApi = {
@@ -21,6 +26,12 @@ const notConfigured: PolarApi = {
   async listProducts() {
     return null;
   },
+  async createCheckout() {
+    return null;
+  },
+  async createCustomerPortalSession() {
+    return null;
+  },
 };
 
 export function buildPolarApi(config?: AuthConfig["polar"]): PolarApi {
@@ -30,7 +41,7 @@ export function buildPolarApi(config?: AuthConfig["polar"]): PolarApi {
 
   const client = new Polar({
     accessToken: config.accessToken,
-    server: config.server ?? "sandbox",
+    server: config.server!,
   });
 
   return {
@@ -61,12 +72,33 @@ export function buildPolarApi(config?: AuthConfig["polar"]): PolarApi {
         });
         const items: Product[] = [];
         for await (const page of pages) {
-          const pageItems =
-            (page as unknown as { result?: { items?: Product[] } }).result
-              ?.items ?? [];
+          const pageItems = page.result?.items ?? [];
           items.push(...pageItems);
         }
         return items;
+      } catch {
+        return null;
+      }
+    },
+
+    async createCheckout(userId, productId) {
+      try {
+        const checkout = await client.checkouts.create({
+          externalCustomerId: userId,
+          products: [productId],
+        });
+        return { url: checkout.url };
+      } catch {
+        return null;
+      }
+    },
+
+    async createCustomerPortalSession(userId) {
+      try {
+        const session = await client.customerSessions.create({
+          externalCustomerId: userId,
+        });
+        return { url: session.customerPortalUrl };
       } catch {
         return null;
       }

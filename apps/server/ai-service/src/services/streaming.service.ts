@@ -229,11 +229,15 @@ export async function handleStreamChat(
       onFinish(event) {
         completedUsage = event.totalUsage;
       },
+      onError({ error }) {
+        console.error("[handleStreamChat] stream error:", error);
+      },
     });
 
-    // Don't await the stream — let it run in the background even if the
-    // client disconnects, so persistence below still completes.
-    result.consumeStream();
+    // Consume the stream to prevent unhandled rejections; let it run in background
+    Promise.resolve(result.consumeStream()).catch((err: unknown) => {
+      console.error("[handleStreamChat] consumeStream error:", err);
+    });
 
     // 8. Return streaming response
     const uiStream = result.toUIMessageStreamResponse<OrraUIMessage>({

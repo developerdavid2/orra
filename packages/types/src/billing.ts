@@ -16,6 +16,7 @@ export interface BillingStatus {
   period: PlanPeriod | null;
   subscriptionId: string | null;
   currentPeriodEnd: string | null;
+  currentProductId: string | null;
   quota: { used: number; limit: number };
   insights: { used: number; limit: number };
 }
@@ -24,7 +25,11 @@ export interface PlanProduct {
   productId: string;
   name: string;
   slug: string;
-  tier: Exclude<PlanTier, "free">;
+  tier: PlanTier;
   period: PlanPeriod;
   priceLabel: string;
+  price: number;
+  description: string;
+  highlighted: boolean;
+  features: string[];
 }

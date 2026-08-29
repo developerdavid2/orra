@@ -14,7 +14,10 @@ import {
   SpendingChart,
   SpendingChartSkeleton,
 } from "../components/spending-chart";
-import { StatCards, StatCardsSkeleton } from "../components/stat-cards";
+import {
+  DashboardStatsCard,
+  DashboardStatsCardSkeleton,
+} from "../components/dashboard-stats-card";
 import {
   TopCategoriesCard,
   TopCategoriesSkeleton,
@@ -30,10 +33,10 @@ export function DashboardView() {
 
       <div className="bg-background border-muted shadow rounded-2xl p-5 space-y-4">
         <SectionBoundary
-          fallback={<StatCardsSkeleton />}
+          fallback={<DashboardStatsCardSkeleton />}
           errorMessage="Could not load overview stats"
         >
-          <StatCards />
+          <DashboardStatsCard />
         </SectionBoundary>
 
         <ChartInsightsRow

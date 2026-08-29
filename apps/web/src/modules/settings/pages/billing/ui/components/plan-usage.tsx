@@ -10,7 +10,12 @@ interface PlanUsageProps {
   reachedLabel?: string;
 }
 
-export function PlanUsage({ used, limit, label, reachedLabel }: PlanUsageProps) {
+export function PlanUsage({
+  used,
+  limit,
+  label,
+  reachedLabel,
+}: PlanUsageProps) {
   const percent = Math.min(100, Math.round((used / limit) * 100));
   const reached = used >= limit;
 
@@ -21,13 +26,11 @@ export function PlanUsage({ used, limit, label, reachedLabel }: PlanUsageProps) 
         {reached && <Badge variant="destructive">Limit reached</Badge>}
       </div>
 
-      <div className="h-1.5 w-full rounded-full bg-muted">
+      <div className="h-1.5 w-full rounded-full bg-accent">
         <div
           className={cn(
             "h-full rounded-full transition-all",
-            reached
-              ? "bg-destructive"
-              : "bg-emerald-500 dark:bg-emerald-400",
+            reached ? "bg-destructive" : "bg-emerald-500 dark:bg-emerald-400",
           )}
           style={{ width: `${percent}%` }}
         />

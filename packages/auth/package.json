@@ -9,7 +9,9 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "seed:polar": "bun --env-file=../../apps/server/user-service/.env scripts/seed-polar-products.ts"
+  },
   "dependencies": {
     "@orra/db": "workspace:*",
     "@orra/types": "workspace:*",
