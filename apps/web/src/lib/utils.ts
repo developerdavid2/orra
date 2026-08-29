@@ -7,10 +7,6 @@ import {
   isYesterday,
 } from "date-fns";
 
-// ═══════════════════════════════════════════════════════════════
-//  DATE UTILITIES — Unified, reusable across all Orra features
-// ═══════════════════════════════════════════════════════════════
-
 function toDate(date: Date | string | number): Date {
   return date instanceof Date ? date : new Date(date);
 }

@@ -4,8 +4,5 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 
 export function useBillingStatus() {
   const trpc = useTRPC();
-  return useSuspenseQuery({
-    ...trpc.users.billing.status.queryOptions(),
-    refetchOnMount: "always",
-  });
+  return useSuspenseQuery(trpc.users.billing.status.queryOptions());
 }

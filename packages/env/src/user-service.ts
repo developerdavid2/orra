@@ -19,6 +19,7 @@ export const userServiceEnv = createEnv({
     POLAR_SERVER: z.enum(["sandbox", "production"]),
     POLAR_SUCCESS_URL: z.string().optional(),
     POLAR_RETURN_URL: z.string().optional(),
+    COOKIE_DOMAIN: z.string().optional(),
   },
   runtimeEnv: process.env,
 });

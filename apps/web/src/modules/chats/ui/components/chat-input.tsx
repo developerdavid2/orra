@@ -16,9 +16,9 @@ import {
   PromptInputTools,
 } from "@orra/ui/components/ai-elements/prompt-input";
 import { cn } from "@orra/ui/lib/utils";
-import { ArrowUp, Eye, Square, Wrench, Brain } from "lucide-react";
-import { useMemo } from "react";
 import type { ChatStatus } from "ai";
+import { ArrowUp, Brain, Eye, Square, Wrench } from "lucide-react";
+import { useMemo } from "react";
 import { useBillingStatus } from "../../../settings/pages/billing/hooks/queries/use-billing-status";
 
 const MODE_OPTIONS: { value: ToolMode; label: string; icon: typeof Eye }[] = [

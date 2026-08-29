@@ -11,6 +11,7 @@ import { otpTemplate, resetPasswordTemplate } from "./lib/email-templates";
 export interface AuthConfig {
   secret: string;
   baseURL: string;
+  cookieDomain?: string;
   polar?: {
     accessToken: string;
     server?: "sandbox" | "production";
@@ -33,8 +34,8 @@ const isDev = process.env.NODE_ENV !== "production";
 export function createAuth(config: AuthConfig) {
   const db = createDb();
 
-  const baseUrl = new URL(config.baseURL);
-  const cookieDomain = isDev ? undefined : baseUrl.hostname;
+  // Use explicit cookieDomain from config, fallback to baseURL hostname in prod
+  const cookieDomain = config.cookieDomain ?? (isDev ? undefined : new URL(config.baseURL).hostname);
 
   return betterAuth({
     basePath: "/api/auth",
@@ -42,6 +43,7 @@ export function createAuth(config: AuthConfig) {
     trustedOrigins: isDev ? ["*"] : trustedOrigins,
     secret: config.secret,
     baseURL: config.baseURL,
+    cookieDomain,
 
     emailAndPassword: {
       enabled: true,

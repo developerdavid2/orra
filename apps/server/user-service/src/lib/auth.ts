@@ -21,6 +21,7 @@ export const polarApi = buildPolarApi(polarConfig);
 export const auth = createAuth({
   secret: userServiceEnv.BETTER_AUTH_SECRET,
   baseURL: userServiceEnv.AUTH_PUBLIC_URL,
+  cookieDomain: userServiceEnv.COOKIE_DOMAIN,
   polar: polarConfig,
   google:
     userServiceEnv.GOOGLE_CLIENT_ID && userServiceEnv.GOOGLE_CLIENT_SECRET
