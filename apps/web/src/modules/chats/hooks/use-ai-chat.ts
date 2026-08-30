@@ -17,14 +17,12 @@ import {
 } from "@orra/types";
 import { webEnv } from "@orra/env/web";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { normalizeChatMessages } from "../lib/message-parts";
+import { invalidateBillingQueries } from "@/lib/invalidate-trpc-queries";
 
 export type { ChatMessage } from "../lib/message-parts";
-
-// ============================================================================
-// NightCode pattern: Type chain from ToolContracts → InferUITools → ChatTools
-// ============================================================================
 
 type ChatTools = {
   [Name in keyof InferUITools<ToolContracts>]: {
@@ -44,6 +42,15 @@ export type Message = UIMessage<ChatMessageMetadata, never, ChatTools>;
 
 export type ChatMode = ToolMode;
 
+const QUOTA_EXCEEDED_MARKERS = ["AI query limit reached", "RATE_LIMITED"];
+
+function isQuotaExceededError(error: Error | undefined): boolean {
+  if (!error?.message) return false;
+  return QUOTA_EXCEEDED_MARKERS.some((marker) =>
+    error.message.includes(marker),
+  );
+}
+
 export function useAIChat({
   sessionId,
   initialMode,
@@ -54,15 +61,16 @@ export function useAIChat({
   initialModel?: SupportedChatModelId | string;
 }) {
   const [input, setInput] = useState("");
+  const [quotaReached, setQuotaReached] = useState(false);
   const [mode, setMode] = useState<ChatMode>(initialMode ?? "plan");
   const [model, setModel] = useState<SupportedChatModelId>(
-    // Old chats/URLs can carry decommissioned model ids (e.g. Groq shut down
-    // llama-3.3-70b-versatile on 08/16/26) — only accept ids still registered.
     initialModel && findSupportedChatModel(initialModel)
       ? (initialModel as SupportedChatModelId)
       : DEFAULT_CHAT_MODEL_ID,
   );
   const prevSessionId = useRef(sessionId);
+
+  const queryClient = useQueryClient();
 
   const isLocal = window.location.hostname === "localhost";
   const url = isLocal
@@ -93,6 +101,9 @@ export function useAIChat({
     id: sessionId,
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    onFinish: () => {
+      invalidateBillingQueries(queryClient);
+    },
   });
 
   useEffect(() => {
@@ -106,16 +117,18 @@ export function useAIChat({
   useEffect(() => {
     if (chat.error) {
       console.error("[useAIChat] stream error:", chat.error);
+      if (isQuotaExceededError(chat.error)) {
+        setQuotaReached(true);
+        return;
+      }
       toast.error("Something went wrong", {
         description: "We couldn't finish that response. Please try again.",
       });
+      return;
     }
+    setQuotaReached(false);
   }, [chat.error]);
 
-  // Healing: stopping mid tool-execution strands a pending tool part in the
-  // last assistant message, which would keep isLoading true forever. Once the
-  // stream settles, strip those dangling parts (unless the SDK is about to
-  // auto-continue the step chain).
   useEffect(() => {
     if (chat.status !== "ready" && chat.status !== "error") return;
 
@@ -151,9 +164,7 @@ export function useAIChat({
           ? m
           : {
               ...m,
-              parts: m.parts.filter(
-                (p) => !(isToolPart(p) && !isSettled(p)),
-              ),
+              parts: m.parts.filter((p) => !(isToolPart(p) && !isSettled(p))),
             },
       ),
     );
@@ -202,6 +213,7 @@ export function useAIChat({
       chat.status === "submitted" ||
       hasPendingToolCall,
     error: chat.error,
+    quotaReached,
     setMessages: chat.setMessages,
     status: chat.status,
     sendMessage,

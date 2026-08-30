@@ -1,0 +1,1 @@
+ALTER TABLE "ai_usage" ADD COLUMN "insight_count" integer DEFAULT 0 NOT NULL;

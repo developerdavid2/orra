@@ -16,9 +16,10 @@ import {
   PromptInputTools,
 } from "@orra/ui/components/ai-elements/prompt-input";
 import { cn } from "@orra/ui/lib/utils";
-import { ArrowUp, Eye, Square, Wrench } from "lucide-react";
-import { useMemo } from "react";
 import type { ChatStatus } from "ai";
+import { ArrowUp, Brain, Eye, Square, Wrench } from "lucide-react";
+import { useMemo } from "react";
+import { useBillingStatus } from "../../../settings/pages/billing/hooks/queries/use-billing-status";
 
 const MODE_OPTIONS: { value: ToolMode; label: string; icon: typeof Eye }[] = [
   { value: "plan", label: "Plan", icon: Eye },
@@ -62,9 +63,16 @@ export function ChatInput({
     return !input?.trim() || isLoading;
   }, [input, isLoading]);
 
-  const status = streamStatus ?? (isLoading ? ("streaming" as const) : ("ready" as const));
+  const status =
+    streamStatus ?? (isLoading ? ("streaming" as const) : ("ready" as const));
 
   const isCompact = variant === "compact";
+
+  const { data: billingStatus } = useBillingStatus();
+  const quotaUsed = billingStatus?.quota?.used ?? 0;
+  const quotaLimit = billingStatus?.quota?.limit ?? 0;
+  const quotaRemaining = Math.max(0, quotaLimit - quotaUsed);
+  const isFree = billingStatus?.planTier === "free";
 
   const modelSelector = (
     <SearchableCombobox
@@ -115,11 +123,23 @@ export function ChatInput({
       className={cn("rounded-full", isCompact && "size-7")}
     >
       {isLoading ? (
-        <Square className={cn("fill-current", isCompact ? "size-2.5" : "size-3")} />
+        <Square
+          className={cn("fill-current", isCompact ? "size-2.5" : "size-3")}
+        />
       ) : (
         <ArrowUp className={cn(isCompact ? "size-3.5" : "size-4")} />
       )}
     </PromptInputSubmit>
+  );
+
+  const usageBadge = (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Brain className="size-3.5" />
+      <span>
+        {quotaRemaining} / {quotaLimit} queries left
+      </span>
+      {isFree && <span className="text-amber-500">(Free)</span>}
+    </div>
   );
 
   return (
@@ -143,14 +163,18 @@ export function ChatInput({
         {/* Footer only for default variant */}
         {!isCompact ? (
           <PromptInputFooter className="border-t">
-            <PromptInputTools>{modelSelector}</PromptInputTools>
+            <PromptInputTools className="flex items-center gap-x-4 w-full">
+              <PromptInputTools>{modelSelector}</PromptInputTools>
+              <div className="flex items-center gap-2">{usageBadge}</div>
+            </PromptInputTools>
           </PromptInputFooter>
         ) : (
           <PromptInputFooter>
             <PromptInputTools className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                {modeToggle}
+              <div className="flex items-center  gap-x-2">
                 {modelSelector}
+                {modeToggle}
+                {usageBadge}
               </div>
               {submitButton}
             </PromptInputTools>

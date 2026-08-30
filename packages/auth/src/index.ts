@@ -1,5 +1,7 @@
 import { createDb } from "@orra/db";
 import * as schema from "@orra/db/schema";
+import { checkout, polar, portal } from "@polar-sh/better-auth";
+import { Polar } from "@polar-sh/sdk";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, twoFactor } from "better-auth/plugins";
@@ -9,9 +11,12 @@ import { otpTemplate, resetPasswordTemplate } from "./lib/email-templates";
 export interface AuthConfig {
   secret: string;
   baseURL: string;
+  cookieDomain?: string;
   polar?: {
     accessToken: string;
+    server?: "sandbox" | "production";
     successUrl: string;
+    returnUrl?: string;
   };
   google?: {
     clientId: string;
@@ -29,9 +34,8 @@ const isDev = process.env.NODE_ENV !== "production";
 export function createAuth(config: AuthConfig) {
   const db = createDb();
 
-  // Determine cookie domain from baseURL for production
-  const baseUrl = new URL(config.baseURL);
-  const cookieDomain = isDev ? undefined : baseUrl.hostname;
+  // Use explicit cookieDomain from config, fallback to baseURL hostname in prod
+  const cookieDomain = config.cookieDomain ?? (isDev ? undefined : new URL(config.baseURL).hostname);
 
   return betterAuth({
     basePath: "/api/auth",
@@ -39,6 +43,7 @@ export function createAuth(config: AuthConfig) {
     trustedOrigins: isDev ? ["*"] : trustedOrigins,
     secret: config.secret,
     baseURL: config.baseURL,
+    cookieDomain,
 
     emailAndPassword: {
       enabled: true,
@@ -59,12 +64,6 @@ export function createAuth(config: AuthConfig) {
           required: false,
           defaultValue: null,
           input: true,
-        },
-        planTier: {
-          type: "string",
-          required: false,
-          defaultValue: "free",
-          input: false,
         },
         nickname: {
           type: "string",
@@ -174,6 +173,27 @@ export function createAuth(config: AuthConfig) {
         issuer: "Orra AI",
         otpOptions: { digits: 6, period: 30 },
       }),
+      ...(config.polar?.accessToken
+        ? [
+            polar({
+              client: new Polar({
+                accessToken: config.polar.accessToken,
+                server: config.polar.server!,
+              }),
+              createCustomerOnSignUp: true,
+              use: [
+                checkout({
+                  authenticatedUsersOnly: true,
+                  successUrl: config.polar.successUrl,
+                  ...(config.polar.returnUrl
+                    ? { returnUrl: config.polar.returnUrl }
+                    : {}),
+                }),
+                portal(),
+              ],
+            }),
+          ]
+        : []),
     ],
 
     socialProviders: config.google
@@ -198,3 +218,6 @@ export function createAuth(config: AuthConfig) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+export { buildPolarApi } from "./polar";
+export type { PolarApi } from "./polar";

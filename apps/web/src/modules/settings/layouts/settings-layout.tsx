@@ -21,7 +21,7 @@ export default async function SettingsLayout({
       >
         <SettingsSidebar />
 
-        <main className="flex-1 overflow-y-auto no-scrollbar px-20">
+        <main className="flex-1 overflow-y-auto no-scrollbar px-5">
           {children}
         </main>
       </div>

@@ -160,18 +160,18 @@ export const coachRouter = router({
         });
       }
 
-      // TODO: Add planTier to user schema
-      // // 2. Check quota
-      // const quotaResult = await AICoachService.checkQuota(
-      //   ctx.session.user.id,
-      //   ctx.session.user.planTier ?? "free",
-      // );
-      // if (!quotaResult.success) {
-      //   throw new TRPCError({
-      //     code: "TOO_MANY_REQUESTS",
-      //     message: quotaResult.error,
-      //   });
-      // }
+      // 2. Check quota. planTier may be null/undefined at runtime — treat as
+      // "free" so the free-tier cap wins by default (conservative).
+      const quotaResult = await AICoachService.checkQuota(
+        ctx.session.user.id,
+        (ctx.session.user.planTier as string | null | undefined) ?? "free",
+      );
+      if (!quotaResult.success) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: quotaResult.error,
+        });
+      }
 
       // 3. Save user message
       const userMessageResult = await AICoachService.saveMessage(
@@ -181,6 +181,7 @@ export const coachRouter = router({
         input.content,
       );
       if (!userMessageResult.success) {
+        await AICoachService.releaseQuota(ctx.session.user.id);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: userMessageResult.error,
@@ -200,6 +201,7 @@ export const coachRouter = router({
         tokensUsed,
       );
       if (!aiMessageResult.success) {
+        await AICoachService.releaseQuota(ctx.session.user.id);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: aiMessageResult.error,

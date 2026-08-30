@@ -16,10 +16,12 @@ import { CHAT_SESSION_MESSAGES } from "../../constants";
 import { useUnarchiveSession } from "../../hooks/mutations/use-unarchive-session";
 import { useMessages } from "../../hooks/queries/use-messages";
 import { useSessionDetails } from "../../hooks/queries/use-session-details";
+import { useBillingStatus } from "../../../settings/pages/billing/hooks/queries/use-billing-status";
 import { useAIChat, type ChatMode } from "../../hooks/use-ai-chat";
 import { dbMessageToChatMessage } from "../../lib/message-parts";
 import { ChatContextPill } from "./chat-context-pill";
 import { ChatInput } from "./chat-input";
+import { ChatQuotaBanner } from "./chat-quota-banner";
 import { ChatSessionShell } from "./chat-session-shell";
 import { ChatStreamMessage } from "./chat-stream-message";
 import type { SupportedChatModelId } from "@orra/types";
@@ -50,6 +52,9 @@ export function ChatConversationArea({
     isFetchingNextPage,
   } = useMessages(sessionId, CHAT_SESSION_MESSAGES);
 
+  const { data: billingStatus } = useBillingStatus();
+  const planTier = billingStatus?.planTier ?? "free";
+
   const {
     messages: streamingMessages,
     input,
@@ -59,6 +64,7 @@ export function ChatConversationArea({
     stop,
     isLoading,
     status,
+    quotaReached,
     mode,
     setMode,
     model,
@@ -119,6 +125,8 @@ export function ChatConversationArea({
           )}
         </div>
       </header>
+
+      {quotaReached && <ChatQuotaBanner planTier={planTier} />}
 
       <ChatSessionShell
         input={input}

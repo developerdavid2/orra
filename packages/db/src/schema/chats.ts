@@ -98,6 +98,7 @@ export const aiUsage = pgTable(
     year: integer("year").notNull(),
     queryCount: integer("query_count").notNull().default(0),
     tokenCount: integer("token_count").notNull().default(0),
+    insightCount: integer("insight_count").notNull().default(0),
     lastQueryAt: timestamp("last_query_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

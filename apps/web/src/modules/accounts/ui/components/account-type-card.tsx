@@ -148,7 +148,7 @@ export function AccountTypeCard({
     <div
       className={cn(
         "group relative overflow-hidden rounded-2xl p-px",
-        "h-[250px] w-full cursor-pointer select-none",
+        "h-62.5 w-full cursor-pointer select-none",
         "ring-1 ring-white/[0.07]",
         "transition-shadow duration-500 ease-out",
         isEmpty && "opacity-40 saturate-50",
@@ -175,7 +175,7 @@ export function AccountTypeCard({
         {/* Top bevel — type-specific tint */}
         <div
           className={cn(
-            "absolute inset-x-0 top-0 h-px bg-gradient-to-r",
+            "absolute inset-x-0 top-0 h-px bg-linear-to-r",
             aurora.bevelColor,
           )}
         />
@@ -186,7 +186,7 @@ export function AccountTypeCard({
         {/* TOP MOVING LIGHT — sweeps on hover */}
         <span
           className={cn(
-            "pointer-events-none absolute top-0 z-20 h-px w-[55%] opacity-0 transition-all duration-500 left-[45%] group-hover:left-4 group-hover:opacity-60 bg-gradient-to-r",
+            "pointer-events-none absolute top-0 z-20 h-px w-[55%] opacity-0 transition-all duration-500 left-[45%] group-hover:left-4 group-hover:opacity-60 bg-linear-to-r",
             aurora.sweepColor,
           )}
         />
@@ -194,7 +194,7 @@ export function AccountTypeCard({
         {/* BOTTOM MOVING LIGHT — sweeps on hover */}
         <span
           className={cn(
-            "pointer-events-none absolute bottom-0 z-20 h-px w-[35%] opacity-0 transition-all duration-500 left-4 group-hover:left-[60%] group-hover:opacity-50 bg-gradient-to-r",
+            "pointer-events-none absolute bottom-0 z-20 h-px w-[35%] opacity-0 transition-all duration-500 left-4 group-hover:left-[60%] group-hover:opacity-50 bg-linear-to-r",
             aurora.sweepColor,
           )}
         />
@@ -235,7 +235,7 @@ export function AccountTypeCard({
 
           {/* BOTTOM: Masked account number + shine line */}
           <div className="space-y-2">
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+            <div className="h-px w-full bg-linear-to-r from-transparent via-white/15 to-transparent" />
             <div className="flex items-end justify-between">
               <p
                 className={cn(

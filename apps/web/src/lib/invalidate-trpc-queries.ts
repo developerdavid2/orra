@@ -55,6 +55,13 @@ export async function invalidateInsightsQueries(queryClient: QueryClient) {
   ]);
 }
 
+export async function invalidateBillingQueries(queryClient: QueryClient) {
+  await Promise.all([
+    invalidateTRPCQueries(queryClient, ["users", "billing", "status"]),
+    invalidateTRPCQueries(queryClient, ["users", "billing", "plans"]),
+  ]);
+}
+
 export async function invalidateChatQueries(queryClient: QueryClient) {
   await invalidateTRPCQueries(queryClient, ["ai", "coach", "sessions"]);
 }

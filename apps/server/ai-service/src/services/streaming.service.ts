@@ -123,6 +123,20 @@ export async function handleStreamChat(
   } = req;
 
   const startTime = Date.now();
+  let quotaReserved = false;
+  let providerStarted = false;
+
+  const releaseUnusedQuota = async () => {
+    if (!quotaReserved || providerStarted) return;
+    quotaReserved = false;
+    const releaseResult = await AICoachService.releaseQuota(userId);
+    if (!releaseResult.success) {
+      console.error(
+        "[handleStreamChat] quota release failed:",
+        releaseResult.error,
+      );
+    }
+  };
 
   try {
     // 1. Session & quota
@@ -142,6 +156,7 @@ export async function handleStreamChat(
     if (!quotaResult.success) {
       return { success: false, error: quotaResult.error, code: "RATE_LIMITED" };
     }
+    quotaReserved = true;
 
     // 2. Fetch context & history BEFORE saving the new user message — the
     // freshly saved turn would otherwise show up in the history result AND
@@ -172,6 +187,7 @@ export async function handleStreamChat(
       userMessage.parts,
     );
     if (!saveUserResult.success) {
+      await releaseUnusedQuota();
       return {
         success: false,
         error: saveUserResult.error,
@@ -229,11 +245,16 @@ export async function handleStreamChat(
       onFinish(event) {
         completedUsage = event.totalUsage;
       },
+      onError({ error }) {
+        console.error("[handleStreamChat] stream error:", error);
+      },
     });
+    providerStarted = true;
 
-    // Don't await the stream — let it run in the background even if the
-    // client disconnects, so persistence below still completes.
-    result.consumeStream();
+    // Consume the stream to prevent unhandled rejections; let it run in background
+    Promise.resolve(result.consumeStream()).catch((err: unknown) => {
+      console.error("[handleStreamChat] consumeStream error:", err);
+    });
 
     // 8. Return streaming response
     const uiStream = result.toUIMessageStreamResponse<OrraUIMessage>({
@@ -304,9 +325,16 @@ export async function handleStreamChat(
           metadata,
         );
 
-        // Credits/billing intentionally not wired up yet — Orra doesn't have
-        // a Polar-equivalent meter in place. When it does, this is where
-        // NightCode calls ingestAiUsage(), gated on `completedUsage`.
+        // The query was reserved by checkQuota before provider work started;
+        // completion only adds token usage to that reservation.
+        try {
+          await AICoachService.incrementAIUsage(
+            userId,
+            completedUsage?.totalTokens ?? 0,
+          );
+        } catch (err) {
+          console.error("[handleStreamChat] usage increment failed:", err);
+        }
       },
       onError(error) {
         console.error("[handleStreamChat] stream error:", error);
@@ -359,6 +387,7 @@ export async function handleStreamChat(
 
     return { success: true };
   } catch (error) {
+    await releaseUnusedQuota();
     const err = error instanceof Error ? error : new Error(String(error));
     console.error("[handleStreamChat]", err);
 

@@ -25,6 +25,7 @@
     "@orra/file-upload": "workspace:*",
     "@orra/sentry": "workspace:*",
     "@orra/types": "workspace:*",
+    "@polar-sh/sdk": "^0.47.0",
     "@trpc/server": "catalog:",
     "@uploadthing/shared": "7.1.8",
     "axios": "^1.18.1",

@@ -6,6 +6,7 @@ import {
   db,
 } from "@orra/db";
 
+import { PLAN_LIMITS } from "@orra/types";
 import type {
   ChatMessage,
   ChatMessagesParamsInput,
@@ -13,48 +14,162 @@ import type {
   ChatSessionsFilterInput,
   PaginatedChatMessages,
   PaginatedChatSessions,
+  PlanTier,
   ServiceResult,
   StartOrCreateChatSessionInput,
 } from "@orra/types";
 import type { UIMessage } from "ai";
 import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 
+function normalizePlanTier(
+  planTier: string | null | undefined,
+): PlanTier {
+  return planTier === "free" || planTier === "pro" || planTier === "team"
+    ? planTier
+    : "free";
+}
+
 async function checkAIQuota(
   userId: string,
-  planTier: string,
+  planTier: string | null | undefined,
 ): Promise<ServiceResult<boolean>> {
-  if (planTier !== "free") {
-    return { success: true, data: true };
-  }
+  const tier = normalizePlanTier(planTier);
+  const limit = PLAN_LIMITS[tier].queries;
 
   const now = new Date();
-  const [usage] = await db
-    .select()
-    .from(aiUsage)
-    .where(
-      and(
-        eq(aiUsage.userId, userId),
-        eq(aiUsage.month, now.getMonth() + 1),
-        eq(aiUsage.year, now.getFullYear()),
-      ),
-    )
-    .limit(1);
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
 
-  if (!usage) {
+  try {
+    const reserved = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${year}:${month}`}, 0))`,
+      );
+
+      const [updated] = await tx
+        .update(aiUsage)
+        .set({
+          queryCount: sql`${aiUsage.queryCount} + 1`,
+          lastQueryAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(aiUsage.userId, userId),
+            eq(aiUsage.month, month),
+            eq(aiUsage.year, year),
+            sql`${aiUsage.queryCount} < ${limit}`,
+          ),
+        )
+        .returning({ id: aiUsage.id });
+
+      if (updated) return true;
+
+      const [existing] = await tx
+        .select({ id: aiUsage.id })
+        .from(aiUsage)
+        .where(
+          and(
+            eq(aiUsage.userId, userId),
+            eq(aiUsage.month, month),
+            eq(aiUsage.year, year),
+          ),
+        )
+        .limit(1);
+
+      if (existing) return false;
+
+      await tx.insert(aiUsage).values({
+        userId,
+        month,
+        year,
+        queryCount: 1,
+        lastQueryAt: now,
+      });
+      return true;
+    });
+
+    if (!reserved) {
+      return {
+        success: false,
+        error: "AI query limit reached for your plan. Upgrade your plan for more queries.",
+        code: "RATE_LIMITED",
+      };
+    }
+
     return { success: true, data: true };
-  }
-
-  // Free tier: 20 queries/month
-  if (usage.queryCount >= 20) {
+  } catch (err) {
+    console.error("[checkAIQuota] transaction failed:", err);
     return {
       success: false,
-      error:
-        "AI query limit reached for free tier. Upgrade to Pro for unlimited queries.",
-      code: "RATE_LIMITED",
+      error: "Failed to check AI quota",
+      code: "DB_ERROR",
     };
   }
+}
 
-  return { success: true, data: true };
+async function checkInsightQuota(
+  userId: string,
+  planTier: string | null | undefined,
+): Promise<ServiceResult<boolean>> {
+  const tier = normalizePlanTier(planTier);
+  const limit = PLAN_LIMITS[tier].insights;
+
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+
+  try {
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: aiUsage.id, insightCount: aiUsage.insightCount })
+        .from(aiUsage)
+        .where(
+          and(
+            eq(aiUsage.userId, userId),
+            eq(aiUsage.month, month),
+            eq(aiUsage.year, year),
+          ),
+        )
+        .limit(1);
+
+      if (!existing) {
+        await tx.insert(aiUsage).values({
+          userId,
+          month,
+          year,
+          insightCount: 1,
+          lastQueryAt: now,
+        });
+        return;
+      }
+
+      if (existing.insightCount >= limit) {
+        throw new Error("RATE_LIMITED");
+      }
+
+      await tx
+        .update(aiUsage)
+        .set({ insightCount: existing.insightCount + 1, lastQueryAt: now })
+        .where(eq(aiUsage.id, existing.id));
+    });
+
+    return { success: true, data: true };
+  } catch (err) {
+    if (err instanceof Error && err.message === "RATE_LIMITED") {
+      return {
+        success: false,
+        error: "AI insight limit reached for your plan. Upgrade your plan for more insights.",
+        code: "RATE_LIMITED",
+      };
+    }
+    console.error("[checkInsightQuota] transaction failed:", err);
+    return {
+      success: false,
+      error: "Failed to check insight quota",
+      code: "DB_ERROR",
+    };
+  }
 }
 
 function generateTitle(
@@ -512,9 +627,45 @@ export const AICoachService = {
 
   async checkQuota(
     userId: string,
-    planTier: string,
+    planTier: string | null | undefined,
   ): Promise<ServiceResult<boolean>> {
     return checkAIQuota(userId, planTier);
+  },
+
+  async releaseQuota(userId: string): Promise<ServiceResult<void>> {
+    try {
+      const now = new Date();
+      await db
+        .update(aiUsage)
+        .set({
+          queryCount: sql`${aiUsage.queryCount} - 1`,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(aiUsage.userId, userId),
+            eq(aiUsage.month, now.getMonth() + 1),
+            eq(aiUsage.year, now.getFullYear()),
+            sql`${aiUsage.queryCount} > 0`,
+          ),
+        );
+
+      return { success: true, data: undefined };
+    } catch (err) {
+      console.error("[AICoachService.releaseQuota]", err);
+      return {
+        success: false,
+        error: "Failed to release AI quota",
+        code: "DB_ERROR",
+      };
+    }
+  },
+
+  async checkInsightQuota(
+    userId: string,
+    planTier: string | null | undefined,
+  ): Promise<ServiceResult<boolean>> {
+    return checkInsightQuota(userId, planTier);
   },
 
   async getUsage(userId: string): Promise<ServiceResult<AIUsageRecord | null>> {
@@ -552,38 +703,39 @@ export const AICoachService = {
       const month = now.getMonth() + 1;
       const year = now.getFullYear();
 
-      const [existing] = await db
-        .select()
-        .from(aiUsage)
-        .where(
-          and(
-            eq(aiUsage.userId, userId),
-            eq(aiUsage.month, month),
-            eq(aiUsage.year, year),
-          ),
-        )
-        .limit(1);
+      await db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select({ id: aiUsage.id })
+          .from(aiUsage)
+          .where(
+            and(
+              eq(aiUsage.userId, userId),
+              eq(aiUsage.month, month),
+              eq(aiUsage.year, year),
+            ),
+          )
+          .limit(1)
+          .for("update");
 
-      if (existing) {
-        await db
-          .update(aiUsage)
-          .set({
-            queryCount: existing.queryCount + 1,
-            tokenCount: existing.tokenCount + tokensUsed,
+        if (existing) {
+          await tx
+            .update(aiUsage)
+            .set({
+              tokenCount: sql`${aiUsage.tokenCount} + ${tokensUsed}`,
+              lastQueryAt: now,
+              updatedAt: now,
+            })
+            .where(eq(aiUsage.id, existing.id));
+        } else {
+          await tx.insert(aiUsage).values({
+            userId,
+            month,
+            year,
+            tokenCount: tokensUsed,
             lastQueryAt: now,
-            updatedAt: now,
-          })
-          .where(eq(aiUsage.id, existing.id));
-      } else {
-        await db.insert(aiUsage).values({
-          userId,
-          month,
-          year,
-          queryCount: 1,
-          tokenCount: tokensUsed,
-          lastQueryAt: now,
-        });
-      }
+          });
+        }
+      });
 
       return { success: true, data: undefined };
     } catch (err) {
@@ -591,7 +743,59 @@ export const AICoachService = {
       return {
         success: false,
         error: "Failed to increment usage",
-        code: "INTERNAL_SERVER_ERROR",
+        code: "DB_ERROR",
+      };
+    }
+  },
+
+  async incrementInsightUsage(
+    userId: string,
+  ): Promise<ServiceResult<void>> {
+    try {
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+
+      await db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select({ id: aiUsage.id, insightCount: aiUsage.insightCount })
+          .from(aiUsage)
+          .where(
+            and(
+              eq(aiUsage.userId, userId),
+              eq(aiUsage.month, month),
+              eq(aiUsage.year, year),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          await tx
+            .update(aiUsage)
+            .set({
+              insightCount: existing.insightCount + 1,
+              lastQueryAt: now,
+              updatedAt: now,
+            })
+            .where(eq(aiUsage.id, existing.id));
+        } else {
+          await tx.insert(aiUsage).values({
+            userId,
+            month,
+            year,
+            insightCount: 1,
+            lastQueryAt: now,
+          });
+        }
+      });
+
+      return { success: true, data: undefined };
+    } catch (err) {
+      console.error("[AICoachService.incrementInsightUsage]", err);
+      return {
+        success: false,
+        error: "Failed to increment insight usage",
+        code: "DB_ERROR",
       };
     }
   },

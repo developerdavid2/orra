@@ -14,6 +14,8 @@ export const gatewayEnv = createEnv({
     PAYMENT_SERVICE_URL: z.url(),
     AI_SERVICE_URL: z.url(),
     NOTIFICATION_SERVICE_URL: z.url(),
+    POLAR_ACCESS_TOKEN: z.string().optional(),
+    POLAR_SERVER: z.enum(["sandbox", "production"]),
   },
   runtimeEnv: process.env,
 });

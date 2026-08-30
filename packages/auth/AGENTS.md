@@ -15,6 +15,6 @@ The better-auth server config used by the user service: email OTP and two factor
 
 ## Gotchas
 
-- Polar plugin dependencies are present but unused
+- Polar billing is wired into `createAuth()` when `config.polar` is provided, enabling the checkout and portal sub-plugins; the Polar SDK client lives in `packages/auth`
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

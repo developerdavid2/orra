@@ -1,13 +1,13 @@
 "use client";
 
-import { useStatCards } from "@/modules/dashboard/hooks/use-stat-cards";
+import { useDashboardStats } from "@/modules/dashboard/hooks/use-dashboard-stats";
 import { Skeleton } from "@orra/ui/components/skeleton";
 import { cn } from "@orra/ui/lib/utils";
 import { cardTemplates } from "../../constants";
 
-export function StatCards() {
+export function DashboardStatsCard() {
   const { totalBalance, monthSpending, savingsRate, totalCount } =
-    useStatCards();
+    useDashboardStats();
 
   const values = [
     totalBalance,
@@ -20,7 +20,7 @@ export function StatCards() {
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 backdrop-blur-xl rounded-xl  overflow-hidden">
       <div
         className={cn(
-          "absolute inset-0 bg-linear-to-tr from-white via-violet-300 from-0% via-40% to-30% to-transparent blur-[100px] sm:blur-[250px] opacity-40  overflow-hidden ",
+          "absolute inset-0 bg-linear-to-tr from-white via-violet-300 from-0% via-40% to-30% to-transparent blur-[100px] sm:blur-[250px] opacity-40 overflow-hidden ",
           "hover:shadow-[0_1px_1px_rgba(255,255,255,0.06)_inset,0_18px_40px_rgba(0,0,0,0.18)]",
         )}
       />
@@ -74,7 +74,7 @@ export function StatCards() {
   );
 }
 
-export function StatCardsSkeleton() {
+export function DashboardStatsCardSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4 border border-border bg-card dark:bg-card/50 rounded-2xl">
       {Array.from({ length: 4 }).map((_, i) => (

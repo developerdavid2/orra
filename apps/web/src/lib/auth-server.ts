@@ -1,8 +1,8 @@
 // lib/auth-server.ts
 import type { Route } from "next";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { authClient } from "./auth-client-server";
 
 export interface Session {
   user: {
@@ -11,7 +11,6 @@ export interface Session {
     emailVerified: boolean;
     name: string;
     image?: string | null;
-    planTier?: string;
   };
   session: {
     id: string;
@@ -22,85 +21,13 @@ export interface Session {
 
 export const getServerSession = cache(async (): Promise<Session | null> => {
   try {
-    const cookieStore = await cookies();
-    const allCookies = cookieStore.getAll();
-
-    if (allCookies.length === 0) {
-      console.log("[getServerSession] no cookies found");
+    const { data: session, error } = await authClient.getSession();
+    if (error || !session?.user) {
       return null;
     }
-
-    // Reconstruct cookie header string
-    const cookieHeader = allCookies
-      .map((c) => `${c.name}=${c.value}`)
-      .join("; ");
-
-    console.log(
-      "[getServerSession] cookies found:",
-      allCookies.map((c) => c.name),
-    );
-
-    const appUrl = new URL(
-      process.env.NEXT_PUBLIC_APP_URL ?? "https://localhost:3001",
-    );
-
-    // Use the API gateway URL for session validation to ensure consistent cookie handling
-    const gatewayUrl = process.env.NEXT_PUBLIC_SERVER_URL?.replace("/v1/trpc", "").replace("/v1", "") ?? process.env.SERVER_URL;
-    
-    const response = await fetch(
-      `${gatewayUrl}/v1/auth/get-session`,
-      {
-        headers: {
-          cookie: cookieHeader,
-          "x-forwarded-host": appUrl.host,
-          "x-forwarded-proto": "https",
-        },
-        cache: "no-store",
-      },
-    );
-
-    console.log("[getServerSession] status:", response.status);
-    if (!response.ok) return null;
-
-    return (await response.json()) ?? null;
+    return session as unknown as Session;
   } catch (error) {
     console.error("[getServerSession] threw:", error);
     return null;
   }
 });
-
-/**
- * Use in layouts — redirects to sign-in if not authenticated.
- * Optionally redirects to verify-otp if email not verified.
- */
-export async function requireAuth({
-  redirectTo = "/auth/signin",
-  requireEmailVerified = true,
-}: {
-  redirectTo?: string;
-  requireEmailVerified?: boolean;
-} = {}): Promise<Session> {
-  const session = await getServerSession();
-
-  if (!session?.user) {
-    redirect(redirectTo as Route);
-  }
-
-  if (requireEmailVerified && !session.user.emailVerified) {
-    redirect("/auth/verify-otp");
-  }
-
-  return session;
-}
-
-/**
- * Use in auth pages (signin, signup) — redirects to dashboard if already logged in.
- */
-export async function redirectIfAuthenticated(
-  to: string = "/dashboard",
-): Promise<void> {
-  const session = await getServerSession();
-  if (session?.user) {
-    redirect(to as Route);
-  }
-}

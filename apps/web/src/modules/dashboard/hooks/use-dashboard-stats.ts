@@ -1,7 +1,7 @@
 import { useAccountAggregates } from "@/modules/accounts/hooks/queries/use-account-aggregates";
 import { useCurrentMonthSpending } from "./queries/use-current-month-spending";
 
-export function useStatCards() {
+export function useDashboardStats() {
   const { totalBalance, totalCount, aggregateMap } = useAccountAggregates();
   const { data: monthSpending } = useCurrentMonthSpending();
 
