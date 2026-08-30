@@ -181,6 +181,7 @@ export const coachRouter = router({
         input.content,
       );
       if (!userMessageResult.success) {
+        await AICoachService.releaseQuota(ctx.session.user.id);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: userMessageResult.error,
@@ -200,6 +201,7 @@ export const coachRouter = router({
         tokensUsed,
       );
       if (!aiMessageResult.success) {
+        await AICoachService.releaseQuota(ctx.session.user.id);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: aiMessageResult.error,

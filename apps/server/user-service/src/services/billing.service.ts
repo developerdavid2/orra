@@ -43,8 +43,8 @@ async function getProducts(): Promise<Product[]> {
   return products;
 }
 
-function tierForProduct(product: Product): PlanTier {
-  return TIER_BY_METADATA(product) ?? TIER_BY_NAME(product) ?? "pro";
+function tierForProduct(product: Product): PlanTier | null {
+  return TIER_BY_METADATA(product) ?? TIER_BY_NAME(product);
 }
 
 function highlightedOf(product: Product): boolean {
@@ -75,7 +75,7 @@ export const BillingService = {
           products.find((p) => p.id === active.productId) ??
           (await polarApi.getProduct(active.productId));
         if (product) {
-          planTier = tierForProduct(product);
+          planTier = tierForProduct(product) ?? "free";
         }
         period = periodOf(active.recurringInterval);
         subscriptionId = active.id;

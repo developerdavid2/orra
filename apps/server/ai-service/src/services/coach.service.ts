@@ -41,9 +41,32 @@ async function checkAIQuota(
   const year = now.getFullYear();
 
   try {
-    await db.transaction(async (tx) => {
+    const reserved = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${year}:${month}`}, 0))`,
+      );
+
+      const [updated] = await tx
+        .update(aiUsage)
+        .set({
+          queryCount: sql`${aiUsage.queryCount} + 1`,
+          lastQueryAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(aiUsage.userId, userId),
+            eq(aiUsage.month, month),
+            eq(aiUsage.year, year),
+            sql`${aiUsage.queryCount} < ${limit}`,
+          ),
+        )
+        .returning({ id: aiUsage.id });
+
+      if (updated) return true;
+
       const [existing] = await tx
-        .select({ id: aiUsage.id, queryCount: aiUsage.queryCount })
+        .select({ id: aiUsage.id })
         .from(aiUsage)
         .where(
           and(
@@ -54,36 +77,28 @@ async function checkAIQuota(
         )
         .limit(1);
 
-      if (!existing) {
-        await tx.insert(aiUsage).values({
-          userId,
-          month,
-          year,
-          queryCount: 1,
-          lastQueryAt: now,
-        });
-        return;
-      }
+      if (existing) return false;
 
-      if (existing.queryCount >= limit) {
-        throw new Error("RATE_LIMITED");
-      }
-
-      await tx
-        .update(aiUsage)
-        .set({ queryCount: existing.queryCount + 1, lastQueryAt: now })
-        .where(eq(aiUsage.id, existing.id));
+      await tx.insert(aiUsage).values({
+        userId,
+        month,
+        year,
+        queryCount: 1,
+        lastQueryAt: now,
+      });
+      return true;
     });
 
-    return { success: true, data: true };
-  } catch (err) {
-    if (err instanceof Error && err.message === "RATE_LIMITED") {
+    if (!reserved) {
       return {
         success: false,
         error: "AI query limit reached for your plan. Upgrade your plan for more queries.",
         code: "RATE_LIMITED",
       };
     }
+
+    return { success: true, data: true };
+  } catch (err) {
     console.error("[checkAIQuota] transaction failed:", err);
     return {
       success: false,
@@ -617,6 +632,35 @@ export const AICoachService = {
     return checkAIQuota(userId, planTier);
   },
 
+  async releaseQuota(userId: string): Promise<ServiceResult<void>> {
+    try {
+      const now = new Date();
+      await db
+        .update(aiUsage)
+        .set({
+          queryCount: sql`${aiUsage.queryCount} - 1`,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(aiUsage.userId, userId),
+            eq(aiUsage.month, now.getMonth() + 1),
+            eq(aiUsage.year, now.getFullYear()),
+            sql`${aiUsage.queryCount} > 0`,
+          ),
+        );
+
+      return { success: true, data: undefined };
+    } catch (err) {
+      console.error("[AICoachService.releaseQuota]", err);
+      return {
+        success: false,
+        error: "Failed to release AI quota",
+        code: "DB_ERROR",
+      };
+    }
+  },
+
   async checkInsightQuota(
     userId: string,
     planTier: string | null | undefined,
@@ -661,7 +705,7 @@ export const AICoachService = {
 
       await db.transaction(async (tx) => {
         const [existing] = await tx
-          .select({ id: aiUsage.id, queryCount: aiUsage.queryCount, tokenCount: aiUsage.tokenCount })
+          .select({ id: aiUsage.id })
           .from(aiUsage)
           .where(
             and(
@@ -670,14 +714,14 @@ export const AICoachService = {
               eq(aiUsage.year, year),
             ),
           )
-          .limit(1);
+          .limit(1)
+          .for("update");
 
         if (existing) {
           await tx
             .update(aiUsage)
             .set({
-              queryCount: existing.queryCount + 1,
-              tokenCount: existing.tokenCount + tokensUsed,
+              tokenCount: sql`${aiUsage.tokenCount} + ${tokensUsed}`,
               lastQueryAt: now,
               updatedAt: now,
             })
@@ -687,7 +731,6 @@ export const AICoachService = {
             userId,
             month,
             year,
-            queryCount: 1,
             tokenCount: tokensUsed,
             lastQueryAt: now,
           });
