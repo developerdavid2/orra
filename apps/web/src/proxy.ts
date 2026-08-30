@@ -14,20 +14,36 @@ const publicPaths = [
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip auth check for public paths and API routes
   if (
-    publicPaths.some((path) => pathname === path || pathname.startsWith(path + "/"))
+    publicPaths.some(
+      (path) => pathname === path || pathname.startsWith(path + "/"),
+    )
   ) {
     return NextResponse.next();
   }
 
-  // Check session using better-auth client
-  const { data: session } = await authClient.getSession({
+  const cookieHeader = request.headers.get("cookie") ?? "";
+
+  // TEMP DEBUG — remove once confirmed
+  console.log("[middleware] path:", pathname);
+  console.log("[middleware] cookie header present:", cookieHeader.length > 0);
+  console.log(
+    "[middleware] session_token present:",
+    cookieHeader.includes("__Secure-better-auth.session_token"),
+  );
+
+  const { data: session, error } = await authClient.getSession({
     fetchOptions: {
-      headers: {
-        cookie: request.headers.get("cookie") ?? "",
-      },
+      headers: { cookie: cookieHeader },
+      cache: "no-store",
     },
+  });
+
+  // TEMP DEBUG — remove once confirmed
+  console.log("[middleware] session result:", {
+    hasUser: Boolean(session?.user),
+    userId: session?.user?.id ?? null,
+    error: error ?? null,
   });
 
   if (!session?.user) {
