@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authClient } from "./lib/auth-client-server";
 
 const publicPaths = [
   "/",
@@ -15,36 +14,32 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
-    publicPaths.some(
-      (path) => pathname === path || pathname.startsWith(path + "/"),
-    )
+    publicPaths.some((path) => pathname === path || pathname.startsWith(path + "/"))
   ) {
     return NextResponse.next();
   }
 
   const cookieHeader = request.headers.get("cookie") ?? "";
+  const sessionUrl = `${process.env.NEXT_PUBLIC_SERVER_URL}/v1/auth/get-session`;
 
-  // TEMP DEBUG — remove once confirmed
   console.log("[middleware] path:", pathname);
-  console.log("[middleware] cookie header present:", cookieHeader.length > 0);
-  console.log(
-    "[middleware] session_token present:",
-    cookieHeader.includes("__Secure-better-auth.session_token"),
-  );
+  console.log("[middleware] session URL:", sessionUrl); // ← is this actually what we think it is?
 
-  const { data: session, error } = await authClient.getSession({
-    fetchOptions: {
+  let session: { user?: unknown } | null = null;
+  try {
+    const res = await fetch(sessionUrl, {
       headers: { cookie: cookieHeader },
       cache: "no-store",
-    },
-  });
+    });
+    const rawBody = await res.text();
 
-  // TEMP DEBUG — remove once confirmed
-  console.log("[middleware] session result:", {
-    hasUser: Boolean(session?.user),
-    userId: session?.user?.id ?? null,
-    error: error ?? null,
-  });
+    console.log("[middleware] fetch status:", res.status);
+    console.log("[middleware] raw body:", rawBody); // ← the actual answer
+
+    session = rawBody ? JSON.parse(rawBody) : null;
+  } catch (err) {
+    console.log("[middleware] fetch threw:", err);
+  }
 
   if (!session?.user) {
     const signInUrl = new URL("/auth/signin", request.url);
