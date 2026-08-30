@@ -123,6 +123,20 @@ export async function handleStreamChat(
   } = req;
 
   const startTime = Date.now();
+  let quotaReserved = false;
+  let providerStarted = false;
+
+  const releaseUnusedQuota = async () => {
+    if (!quotaReserved || providerStarted) return;
+    quotaReserved = false;
+    const releaseResult = await AICoachService.releaseQuota(userId);
+    if (!releaseResult.success) {
+      console.error(
+        "[handleStreamChat] quota release failed:",
+        releaseResult.error,
+      );
+    }
+  };
 
   try {
     // 1. Session & quota
@@ -142,6 +156,7 @@ export async function handleStreamChat(
     if (!quotaResult.success) {
       return { success: false, error: quotaResult.error, code: "RATE_LIMITED" };
     }
+    quotaReserved = true;
 
     // 2. Fetch context & history BEFORE saving the new user message — the
     // freshly saved turn would otherwise show up in the history result AND
@@ -172,6 +187,7 @@ export async function handleStreamChat(
       userMessage.parts,
     );
     if (!saveUserResult.success) {
+      await releaseUnusedQuota();
       return {
         success: false,
         error: saveUserResult.error,
@@ -233,6 +249,7 @@ export async function handleStreamChat(
         console.error("[handleStreamChat] stream error:", error);
       },
     });
+    providerStarted = true;
 
     // Consume the stream to prevent unhandled rejections; let it run in background
     Promise.resolve(result.consumeStream()).catch((err: unknown) => {
@@ -308,8 +325,8 @@ export async function handleStreamChat(
           metadata,
         );
 
-        // Usage accounting — mirrors what NightCode calls ingestAiUsage(),
-        // gated on `completedUsage`. free-tier cap enforced via checkQuota.
+        // The query was reserved by checkQuota before provider work started;
+        // completion only adds token usage to that reservation.
         try {
           await AICoachService.incrementAIUsage(
             userId,
@@ -370,6 +387,7 @@ export async function handleStreamChat(
 
     return { success: true };
   } catch (error) {
+    await releaseUnusedQuota();
     const err = error instanceof Error ? error : new Error(String(error));
     console.error("[handleStreamChat]", err);
 
