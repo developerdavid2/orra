@@ -25,12 +25,12 @@ export async function proxy(request: NextRequest) {
   const cookieHeader = request.headers.get("cookie") ?? "";
 
   // TEMP DEBUG — remove once confirmed
-  console.log("[middleware] path:", pathname);
-  console.log("[middleware] cookie header present:", cookieHeader.length > 0);
-  console.log(
-    "[middleware] session_token present:",
-    cookieHeader.includes("__Secure-better-auth.session_token"),
-  );
+  // console.log("[middleware] path:", pathname);
+  // console.log("[middleware] cookie header present:", cookieHeader.length > 0);
+  // console.log(
+  //   "[middleware] session_token present:",
+  //   cookieHeader.includes("__Secure-better-auth.session_token"),
+  // );
 
   const { data: session, error } = await authClient.getSession({
     fetchOptions: {
@@ -39,12 +39,12 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // TEMP DEBUG — remove once confirmed
-  console.log("[middleware] session result:", {
-    hasUser: Boolean(session?.user),
-    userId: session?.user?.id ?? null,
-    error: error ?? null,
-  });
+  // // TEMP DEBUG — remove once confirmed
+  // console.log("[middleware] session result:", {
+  //   hasUser: Boolean(session?.user),
+  //   userId: session?.user?.id ?? null,
+  //   error: error ?? null,
+  // });
 
   if (!session?.user) {
     const signInUrl = new URL("/auth/signin", request.url);

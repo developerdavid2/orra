@@ -2,7 +2,6 @@ interface AuthenticationLayoutProps {
   children: React.ReactNode;
 }
 
-export const dynamic = "force-dynamic";
 const AuthenticationLayout = async ({
   children,
 }: AuthenticationLayoutProps) => {

@@ -8,6 +8,7 @@ import {
   authRateLimit,
   globalRateLimit,
   plaidRateLimit,
+  sessionCheckRateLimit,
 } from "./middleware/rate-limit.middleware";
 import {
   mountAiSdkChatStreamProxy,
@@ -31,8 +32,16 @@ const app = createExpressApp({
 app.use(requestLogger);
 app.use(globalRateLimit);
 
-app.use("/v1/auth", authRateLimit);
 app.use("/v1/trpc/payments.plaid", plaidRateLimit);
+
+app.use("/v1/auth/get-session", sessionCheckRateLimit);
+
+// Credential-submission routes only — this is where brute-force protection belongs
+app.use("/v1/auth/sign-in", authRateLimit);
+app.use("/v1/auth/sign-up", authRateLimit);
+app.use("/v1/auth/sign-in/email-otp", authRateLimit);
+app.use("/v1/auth/forget-password", authRateLimit);
+app.use("/v1/auth/reset-password", authRateLimit);
 
 app.use(authMiddleware);
 mountProxies(app);

@@ -35,7 +35,9 @@ export function createAuth(config: AuthConfig) {
   const db = createDb();
 
   // Use explicit cookieDomain from config, fallback to baseURL hostname in prod
-  const cookieDomain = config.cookieDomain ?? (isDev ? undefined : new URL(config.baseURL).hostname);
+  const cookieDomain =
+    config.cookieDomain ??
+    (isDev ? undefined : new URL(config.baseURL).hostname);
 
   return betterAuth({
     basePath: "/api/auth",
