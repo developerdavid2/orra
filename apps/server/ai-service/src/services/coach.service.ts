@@ -21,9 +21,7 @@ import type {
 import type { UIMessage } from "ai";
 import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 
-function normalizePlanTier(
-  planTier: string | null | undefined,
-): PlanTier {
+function normalizePlanTier(planTier: string | null | undefined): PlanTier {
   return planTier === "free" || planTier === "pro" || planTier === "team"
     ? planTier
     : "free";
@@ -92,7 +90,8 @@ async function checkAIQuota(
     if (!reserved) {
       return {
         success: false,
-        error: "AI query limit reached for your plan. Upgrade your plan for more queries.",
+        error:
+          "AI query limit reached for your plan. Upgrade your plan for more queries.",
         code: "RATE_LIMITED",
       };
     }
@@ -134,6 +133,9 @@ async function checkInsightQuota(
         .limit(1);
 
       if (!existing) {
+        if (limit < 1) {
+          throw new Error("RATE_LIMITED");
+        }
         await tx.insert(aiUsage).values({
           userId,
           month,
@@ -159,7 +161,8 @@ async function checkInsightQuota(
     if (err instanceof Error && err.message === "RATE_LIMITED") {
       return {
         success: false,
-        error: "AI insight limit reached for your plan. Upgrade your plan for more insights.",
+        error:
+          "AI insight limit reached for your plan. Upgrade your plan for more insights.",
         code: "RATE_LIMITED",
       };
     }
@@ -705,7 +708,11 @@ export const AICoachService = {
 
       await db.transaction(async (tx) => {
         const [existing] = await tx
-          .select({ id: aiUsage.id })
+          .select({
+            id: aiUsage.id,
+            queryCount: aiUsage.queryCount,
+            tokenCount: aiUsage.tokenCount,
+          })
           .from(aiUsage)
           .where(
             and(
@@ -748,9 +755,7 @@ export const AICoachService = {
     }
   },
 
-  async incrementInsightUsage(
-    userId: string,
-  ): Promise<ServiceResult<void>> {
+  async incrementInsightUsage(userId: string): Promise<ServiceResult<void>> {
     try {
       const now = new Date();
       const month = now.getMonth() + 1;

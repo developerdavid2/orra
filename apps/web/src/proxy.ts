@@ -43,6 +43,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next|favicon.ico|public|api/auth).*)",
+    "/((?!_next|favicon.ico|public|api/auth|api/trpc|api/stream|firebase-messaging-sw.js).*)",
   ],
 };

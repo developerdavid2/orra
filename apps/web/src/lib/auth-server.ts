@@ -1,6 +1,5 @@
 // lib/auth-server.ts
-import type { Route } from "next";
-import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { cache } from "react";
 import { authClient } from "./auth-client-server";
 
@@ -21,7 +20,18 @@ export interface Session {
 
 export const getServerSession = cache(async (): Promise<Session | null> => {
   try {
-    const { data: session, error } = await authClient.getSession();
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore.getAll()
+      .map((c) => `${c.name}=${c.value}`)
+      .join("; ");
+
+    const { data: session, error } = await authClient.getSession({
+      fetchOptions: {
+        headers: {
+          cookie: cookieHeader,
+        },
+      },
+    });
     if (error || !session?.user) {
       return null;
     }
